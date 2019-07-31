@@ -48,6 +48,7 @@ import optparse
 import logging as l
 import re
 
+from datetime import datetime
 from osgeo import ogr
 from osgeo import osr
 from geom import *
@@ -260,7 +261,7 @@ def parseGeometry(ogrgeometries):
         elif (geometryType == ogr.wkbLineString or
               geometryType == ogr.wkbLinearRing or
               geometryType == ogr.wkbLineString25D):
-#             geometryType == ogr.wkbLinearRing25D does not exist
+            # geometryType == ogr.wkbLinearRing25D does not exist
             returngeometries.append(parseLineString(ogrgeometry))
         elif (geometryType == ogr.wkbPolygon or
               geometryType == ogr.wkbPolygon25D):
@@ -469,7 +470,7 @@ def splitWayInRelation(rel, way_parts):
         rel.members.append((way, way_role))
 
 
-def output():
+def output(outputfile: str, options):
     l.debug("Outputting XML")
     # First, set up a few data structures for optimization purposes
     nodes = [geom for geom in Geometry.geometries if type(geom) == Point]
@@ -478,30 +479,32 @@ def output():
     featuresmap = {feature.geometry : feature for feature in Feature.features}
 
     # Open up the output file with the system default buffering
-    with open(OPTIONS.outputFile, 'w', buffering=-1) as f:
+    with open(outputfile, 'w', buffering=-1) as f:
 
         dec_string = '<?xml version="1.0"?>\n<osm version="0.6" generator="uvmogr2osm"'
-        if OPTIONS.neverUpload:
+        if options.neverUpload:
             dec_string += ' upload="never"'
-        elif not OPTIONS.noUploadFalse:
+        elif not options.noUploadFalse:
             dec_string += ' upload="false"'
-        if OPTIONS.neverDownload:
+        if options.neverDownload:
             dec_string += ' download="never"'
-        if OPTIONS.locked:
+        if options.locked:
             dec_string += ' locked="true"'
         dec_string += '>\n'
         f.write(dec_string)
 
         # Build up a dict for optional settings
         attributes = {}
-        if OPTIONS.addVersion:
-            attributes.update({'version':'1'})
+        if options.addVersion:
+            attributes.update({'version': '1'})
 
-        if OPTIONS.addTimestamp:
-            attributes.update({'timestamp':datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')})
+        if options.addTimestamp:
+            attributes.update(
+                {'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')})
 
         for node in nodes:
-            xmlattrs = {'visible':'true','id':str(node.id), 'lat':str(node.y*10**-OPTIONS.significantDigits), 'lon':str(node.x*10**-OPTIONS.significantDigits)}
+            xmlattrs = {'visible': 'true', 'id': str(node.id), 'lat': str(
+                node.y*10**-options.significantDigits), 'lon': str(node.x*10**-options.significantDigits)}
             xmlattrs.update(attributes)
 
             xmlobject = etree.Element('node', xmlattrs)
@@ -672,9 +675,6 @@ def main():
         parser.error("you have specified too many arguments, " +
                      "only supply the source filename")
 
-    if OPTIONS.addTimestamp:
-        from datetime import datetime
-
     # Input and output file
     # if no output file given, use the basename of the source but with .osm
     source = args[0]
@@ -774,7 +774,7 @@ def main():
     if OPTIONS.maxNodesPerWay >= 2:
         splitLongWays(OPTIONS.maxNodesPerWay, LONG_WAYS_FROM_POLYGONS)
     TRANSLATIONS.preOutputTransform(Geometry.geometries, Feature.features)
-    output()
+    output(OPTIONS.outputFile, OPTIONS)
     if OPTIONS.saveid:
         with open(OPTIONS.saveid, 'wb') as ff:
             ff.write(str(Geometry.elementIdCounter))
