@@ -58,8 +58,6 @@ class Relation(Geometry):
 
 
 class Feature(object):
-    # features = []
-
     def __init__(self, parent):
         self.geometry = None
         self.tags = {}
