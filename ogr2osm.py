@@ -111,6 +111,10 @@ class OSMSink(object):
             sourcepath = Path(sourcepath)
             self.source = self.get_file_data(sourcepath, nomemorycopy)
 
+    def get_new_id(self) -> int:
+        self.element_id_counter += self.element_id_counter_incr
+        return self.element_id_counter
+
     @staticmethod
     def get_file_data(filename: Path, nomemorycopy: bool = None) -> ogr.DataSource:
         ogr_accessmethods = ["vsicurl", "vsicurl_streaming", "vsisubfile",

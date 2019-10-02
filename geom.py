@@ -8,9 +8,8 @@
 
 
 class Geometry(object):
-
     def __init__(self, osm_sink):
-        self.id = getNewID(osm_sink)
+        self.id = osm_sink.get_new_id()
         self.parents = set()
         osm_sink.geometries.append(self)
 
@@ -20,17 +19,10 @@ class Geometry(object):
     def addparent(self, parent):
         self.parents.add(parent)
 
-    def removeparent(self, osm_sink, parent, shoulddestroy=True):
+    def removeparent(self, osm_sink, parent, should_destroy=True):
         self.parents.discard(parent)
-        if shoulddestroy and len(self.parents) == 0:
+        if should_destroy and len(self.parents) == 0:
             osm_sink.geometries.remove(self)
-
-# Helper function to get a new ID
-
-
-def getNewID(parent):
-    parent.element_id_counter += parent.element_id_counter_incr
-    return parent.element_id_counter
 
 
 class Point(Geometry):
