@@ -54,6 +54,7 @@ if __name__ == "__main__":
     import argparse
 
 # By default, OGR doesn't raise exceptions, but we want to quit if something isn't working
+# Thanks to OGR weirdness, exceptions are not raised on ogr.Open()
 ogr.UseExceptions()
 
 l.basicConfig(level=l.DEBUG, format="%(message)s")
@@ -457,7 +458,7 @@ class OSMSink(object):
         significant_digits = kwargs.get(
             'significant_digits', self.significant_digits)
 
-        # Promote string to path if neccessary, has no effect on a Path
+        # Promote string to Path if neccessary, has no effect if already a Path
         outputfile = Path(outputfile)
 
         if outputfile.exists() and not force_overwrite:
@@ -682,6 +683,7 @@ def main():
     elif options["source_epsg"]:
         l.info("Will use EPSG:" + str(options["source_epsg"]))
 
+    # Create memory object for data destination
     try:
         sink = OSMSink(options["source"], **options)
     except RuntimeError:
@@ -759,10 +761,13 @@ def main():
         sink.split_long_ways(options["max_nodes_per_way"],
                              sink.long_ways_from_polygons)
     sink.translations.pre_output_transform(sink.geometries, sink.features)
+    # Save data to file
     sink.output(
         options["output_file"],
         options["force_overwrite"]
     )
+
+    # Save last used id to file
     if options["saveid"]:
         with open(options["saveid"], 'wb') as ff:
             ff.write(str(sink.element_id_counter))
