@@ -107,7 +107,6 @@ class OSMSink(object):
         # Projection
         proj4 = kwargs.get('source_proj4', None)
         sourceepsg = kwargs.get('source_epsg', None)
-        spatialref = None
         if proj4:
             spatialref = osr.SpatialReference().ImportFromProj4(proj4)
         elif sourceepsg and sourceepsg != 4326:
@@ -167,7 +166,6 @@ class OSMSink(object):
         if layer is None:
             return
         field_names = self.get_layer_fields(layer)
-        layer_coordtrans = None
         if self.coordtrans:
             layer_coordtrans = self.coordtrans
         else:
