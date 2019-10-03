@@ -434,13 +434,20 @@ class OSMSink(object):
         for way in way_parts:
             way.addparent(new_relation)
 
-    def split_way_in_relation(self, rel, way_parts):
+    @staticmethod
+    def split_way_in_relation(rel, way_parts):
         way_roles = [m[1] for m in rel.members if m[0] == way_parts[0]]
         way_role = "" if len(way_roles) == 0 else way_roles[0]
         for way in way_parts[1:]:
             rel.members.append((way, way_role))
 
     def output(self, outputfile, force_overwrite: bool = False, **kwargs):
+        """
+        Outputs the sink to the specified path
+
+        :param outputfile: string or Path representing the output location
+        :param force_overwrite: if True, overwrite a file if it exists
+        """
         never_upload = kwargs.get('never_upload', self.never_upload)
         no_upload_false = kwargs.get('no_upload_false', self.no_upload_false)
         never_download = kwargs.get('never_download', self.never_download)
