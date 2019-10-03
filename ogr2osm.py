@@ -556,78 +556,78 @@ class OSMSink:
             feature.geometry: feature for feature in self.features}
 
         # Open up the output file with the system default buffering
-
         with outputfile.open(write_mode, buffering=-1) as f:
-            root = etree.Element("osm", version="0.6", generator="uvmogr2osm")
-            if never_upload:
-                root.attrib["upload"] = "never"
-            elif not no_upload_false:
-                root.attrib["upload"] = "false"
-            if never_download:
-                root.attrib["download"] = "never"
-            if locked:
-                root.attrib["locked"] = "true"
-            # f.write(root)
+            with etree.xmlfile(f, encoding='utf-8', buffered=False) as xf:
+                xf.write_declaration()
+                attrib = {}
+                if never_upload:
+                    attrib["upload"] = "never"
+                elif not no_upload_false:
+                    attrib["upload"] = "false"
+                if never_download:
+                    attrib["download"] = "never"
+                if locked:
+                    attrib["locked"] = "true"
+                with xf.element('osm', version="0.6", generator="uvmogr2osm", **attrib):
+                    # Build up a dict for optional settings
+                    attributes = {}
+                    if add_version:
+                        attributes.update({'version': '1'})
 
-            # Build up a dict for optional settings
-            attributes = {}
-            if add_version:
-                attributes.update({'version': '1'})
+                    if add_timestamp:
+                        attributes.update(
+                            {'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')})
 
-            if add_timestamp:
-                attributes.update(
-                    {'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')})
+                    for node in nodes:
+                        xmlattrs = {'visible': 'true', 'id': str(node.id), 'lat': str(
+                            node.y*10**-significant_digits), 'lon': str(node.x*10**-significant_digits)}
+                        xmlattrs.update(attributes)
 
-            for node in nodes:
-                xmlattrs = {'visible': 'true', 'id': str(node.id), 'lat': str(
-                    node.y*10**-significant_digits), 'lon': str(node.x*10**-significant_digits)}
-                xmlattrs.update(attributes)
+                        xmlobject = etree.Element('node', xmlattrs)
 
-                xmlobject = etree.Element('node', xmlattrs)
+                        if node in featuresmap:
+                            for (key, value) in featuresmap[node].tags.items():
+                                tag = etree.Element(
+                                    'tag', {'k': key, 'v': value})
+                                xmlobject.append(tag)
+                        xf.write(xmlobject)
 
-                if node in featuresmap:
-                    for (key, value) in featuresmap[node].tags.items():
-                        tag = etree.Element('tag', {'k': key, 'v': value})
+                    for way in ways:
+                        xmlattrs = {'visible': 'true', 'id': str(way.id)}
+                        xmlattrs.update(attributes)
+
+                        xmlobject = etree.Element('way', xmlattrs)
+
+                        for node in way.points:
+                            nd = etree.Element('nd', {'ref': str(node.id)})
+                            xmlobject.append(nd)
+                        if way in featuresmap:
+                            for (key, value) in featuresmap[way].tags.items():
+                                tag = etree.Element(
+                                    'tag', {'k': key, 'v': value})
+                                xmlobject.append(tag)
+                        xf.write(xmlobject)
+
+                    for relation in relations:
+                        xmlattrs = {'visible': 'true', 'id': str(relation.id)}
+                        xmlattrs.update(attributes)
+
+                        xmlobject = etree.Element('relation', xmlattrs)
+
+                        for (member, role) in relation.members:
+                            member = etree.Element(
+                                'member', {'type': 'way', 'ref': str(member.id), 'role': role})
+                            xmlobject.append(member)
+
+                        tag = etree.Element(
+                            'tag', {'k': 'type', 'v': 'multipolygon'})
                         xmlobject.append(tag)
-                root.append(xmlobject)
-                # f.write(etree.tostring(xmlobject, encoding='unicode'))
-                # f.write('\n')
-
-            for way in ways:
-                xmlattrs = {'visible': 'true', 'id': str(way.id)}
-                xmlattrs.update(attributes)
-
-                xmlobject = etree.Element('way', xmlattrs)
-
-                for node in way.points:
-                    nd = etree.Element('nd', {'ref': str(node.id)})
-                    xmlobject.append(nd)
-                if way in featuresmap:
-                    for (key, value) in featuresmap[way].tags.items():
-                        tag = etree.Element('tag', {'k': key, 'v': value})
-                        xmlobject.append(tag)
-                root.append(xmlobject)
-
-            for relation in relations:
-                xmlattrs = {'visible': 'true', 'id': str(relation.id)}
-                xmlattrs.update(attributes)
-
-                xmlobject = etree.Element('relation', xmlattrs)
-
-                for (member, role) in relation.members:
-                    member = etree.Element(
-                        'member', {'type': 'way', 'ref': str(member.id), 'role': role})
-                    xmlobject.append(member)
-
-                tag = etree.Element('tag', {'k': 'type', 'v': 'multipolygon'})
-                xmlobject.append(tag)
-                if relation in featuresmap:
-                    for (key, value) in featuresmap[relation].tags.items():
-                        tag = etree.Element('tag', {'k': key, 'v': value})
-                        xmlobject.append(tag)
-                root.append(xmlobject)
-            tree = etree.ElementTree(root)
-            tree.write(f, pretty_print=pretty_print)
+                        if relation in featuresmap:
+                            for (key, value) in featuresmap[relation].tags.items():
+                                tag = etree.Element(
+                                    'tag', {'k': key, 'v': value})
+                                xmlobject.append(tag)
+                        xf.write(xmlobject)
 
             # Save last used id to file
         if saveid:
