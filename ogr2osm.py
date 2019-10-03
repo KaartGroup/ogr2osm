@@ -335,8 +335,8 @@ class OSMSink(object):
         and passes them to the filter_tags function, returning the result.
         '''
         tags = {}
-        for i in range(len(field_names)):
-            tags[field_names[i]] = ogrfeature.GetFieldAsString(i).strip()
+        for index, item in enumerate(field_names):
+            tags[item] = ogrfeature.GetFieldAsString(index).strip()
         return self.translations.filter_tags(tags)
         # return tags
 
