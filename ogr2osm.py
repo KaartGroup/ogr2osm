@@ -40,18 +40,17 @@ Based very heavily on code released under the following terms:
 
 '''
 
+import argparse
 import logging as l
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Tuple, Union
 
 from geom import Feature, Point, Relation, Way
 from lxml import etree
 from osgeo import ogr, osr
-
-if __name__ == "__main__":
-    import argparse
 
 # By default, OGR doesn't raise exceptions, but we want to quit if something isn't working
 # Thanks to OGR weirdness, exceptions are not raised on ogr.Open()
@@ -65,9 +64,10 @@ class OSMSink(object):
     Can accept an ogr.DataSource or a path to one in string or Path form
     """
 
-    destspatialref = osr.SpatialReference().ImportFromEPSG(4326)
+    destspatialref = osr.SpatialReference()
+    destspatialref.ImportFromEPSG(4326)
 
-    def __init__(self, sourcepath, *args, **kwargs):
+    def __init__(self, sourcepath: Union[str, Path, ogr.DataSource], *args, **kwargs):
         self.never_upload = kwargs.get('never_upload', False)
         self.no_upload_false = kwargs.get('no_upload_false', False)
         self.never_download = kwargs.get('never_download', False)
@@ -112,12 +112,13 @@ class OSMSink(object):
             spatialref = osr.SpatialReference().ImportFromProj4(proj4)
         elif sourceepsg and sourceepsg != 4326:
             spatialref = osr.SpatialReference().ImportFromEPSG(sourceepsg)
+        else:
+            spatialref = None
         if spatialref:
             self.coordtrans = osr.CoordinateTransformation(
                 spatialref, self.destspatialref)
         else:
             self.coordtrans = None
-        self.parse_data()
 
     def get_new_id(self) -> int:
         self.element_id_counter += self.element_id_counter_incr
@@ -175,11 +176,13 @@ class OSMSink(object):
             if spatialref != self.destspatialref:
                 layer_coordtrans = osr.CoordinateTransformation(
                     spatialref, self.destspatialref)
+            else:
+                layer_coordtrans = None
 
         for j in range(layer.GetFeatureCount()):
             ogrfeature = layer.GetNextFeature()
             self.parse_feature(self.translations.filter_feature(
-                ogrfeature, field_names, self.reproject), field_names, layer_coordtrans)
+                ogrfeature, field_names, layer_coordtrans), field_names, layer_coordtrans)
 
     def parse_feature(self, ogrfeature: ogr.Feature, field_names: list,
                       coordtrans: osr.CoordinateTransformation):
@@ -442,7 +445,7 @@ class OSMSink(object):
         for way in way_parts[1:]:
             rel.members.append((way, way_role))
 
-    def output(self, outputfile, force_overwrite: bool = False, **kwargs):
+    def output(self, outputfile: Union[str, Path], force_overwrite: bool = False, **kwargs):
         """
         Outputs the sink to the specified path
 
@@ -461,8 +464,10 @@ class OSMSink(object):
         # Promote string to Path if neccessary, has no effect if already a Path
         outputfile = Path(outputfile)
 
-        if outputfile.exists() and not force_overwrite:
-            raise FileExistsError
+        if force_overwrite:
+            write_mode = 'w'
+        else:
+            write_mode = 'x'
 
         l.debug("Outputting XML")
         # First, set up a few data structures for optimization purposes
@@ -474,7 +479,7 @@ class OSMSink(object):
             feature.geometry: feature for feature in self.features}
 
         # Open up the output file with the system default buffering
-        with outputfile.open('w', buffering=-1) as f:
+        with outputfile.open(write_mode, buffering=-1) as f:
 
             dec_string = '<?xml version="1.0"?>\n<osm version="0.6" generator="uvmogr2osm"'
             if never_upload:
@@ -755,6 +760,7 @@ def main():
             setattr(sink.translations, k, v)
 
     # Main flow
+    sink.parse_data()
     sink.merge_points()
     sink.merge_way_points()
     if options["max_nodes_per_way"] >= 2:
