@@ -536,14 +536,15 @@ class OSMSink:
         significant_digits = kwargs.get(
             'significant_digits', self.significant_digits)
         saveid = kwargs.get('saveid', self.saveid)
+        pretty_print = kwargs.get('pretty_print', False)
 
         # Promote string to Path if neccessary, has no effect if already a Path
         outputfile = Path(outputfile)
 
         if force_overwrite:
-            write_mode = 'w'
+            write_mode = 'wb'
         else:
-            write_mode = 'x'
+            write_mode = 'xb'
 
         l.debug("Outputting XML")
         # First, set up a few data structures for optimization purposes
@@ -555,19 +556,18 @@ class OSMSink:
             feature.geometry: feature for feature in self.features}
 
         # Open up the output file with the system default buffering
-        with outputfile.open(write_mode, buffering=-1) as f:
 
-            dec_string = '<?xml version="1.0"?>\n<osm version="0.6" generator="uvmogr2osm"'
+        with outputfile.open(write_mode, buffering=-1) as f:
+            root = etree.Element("osm", version="0.6", generator="uvmogr2osm")
             if never_upload:
-                dec_string += ' upload="never"'
+                root.attrib["upload"] = "never"
             elif not no_upload_false:
-                dec_string += ' upload="false"'
+                root.attrib["upload"] = "false"
             if never_download:
-                dec_string += ' download="never"'
+                root.attrib["download"] = "never"
             if locked:
-                dec_string += ' locked="true"'
-            dec_string += '>\n'
-            f.write(dec_string)
+                root.attrib["locked"] = "true"
+            # f.write(root)
 
             # Build up a dict for optional settings
             attributes = {}
@@ -589,8 +589,9 @@ class OSMSink:
                     for (key, value) in featuresmap[node].tags.items():
                         tag = etree.Element('tag', {'k': key, 'v': value})
                         xmlobject.append(tag)
-                f.write(etree.tostring(xmlobject, encoding='unicode'))
-                f.write('\n')
+                root.append(xmlobject)
+                # f.write(etree.tostring(xmlobject, encoding='unicode'))
+                # f.write('\n')
 
             for way in ways:
                 xmlattrs = {'visible': 'true', 'id': str(way.id)}
@@ -605,8 +606,7 @@ class OSMSink:
                     for (key, value) in featuresmap[way].tags.items():
                         tag = etree.Element('tag', {'k': key, 'v': value})
                         xmlobject.append(tag)
-                f.write(etree.tostring(xmlobject, encoding='unicode'))
-                f.write('\n')
+                root.append(xmlobject)
 
             for relation in relations:
                 xmlattrs = {'visible': 'true', 'id': str(relation.id)}
@@ -625,11 +625,9 @@ class OSMSink:
                     for (key, value) in featuresmap[relation].tags.items():
                         tag = etree.Element('tag', {'k': key, 'v': value})
                         xmlobject.append(tag)
-
-                f.write(etree.tostring(xmlobject, encoding='unicode'))
-                f.write('\n')
-
-            f.write('</osm>')
+                root.append(xmlobject)
+            tree = etree.ElementTree(root)
+            tree.write(f, pretty_print=pretty_print)
 
             # Save last used id to file
         if saveid:
