@@ -554,9 +554,7 @@ class OSMSink(object):
             f.write('</osm>')
 
 
-def main():
-    # Setup program usage
-
+def setup(args: dict) -> Tuple[dict, argparse.ArgumentParser]:
     parser = argparse.ArgumentParser(prog=sys.argv[0])
     parser.add_argument('source',
                         type=str, metavar="INPUT",
@@ -579,57 +577,42 @@ def main():
                         help="Output the tags for every feature parsed.")
     parser.add_argument("-f", "--force", dest="force_overwrite", action="store_true",
                         help="Force overwrite of output file.")
-
     parser.add_argument("--significant-digits",  dest="significant_digits", type=int,
                         help="Number of decimal places for coordinates", default=9)
-
     parser.add_argument("--rounding-digits",  dest="rounding_digits", type=int,
                         help="Number of decimal places for rounding", default=7)
-
     parser.add_argument("--no-memory-copy", dest="no_memory_copy", action="store_true",
                         help="Do not make an in-memory working copy")
-
     parser.add_argument("--no-upload-false", dest="no_upload_false", action="store_true",
                         help="Omit upload=false from the completed file to " +
                         "supress JOSM warnings when uploading.")
-
     parser.add_argument("--never-download", dest="never_download", action="store_true",
                         help="Prevent JOSM from downloading more data to this file.")
-
     parser.add_argument("--never-upload", dest="never_upload", action="store_true",
                         help="Completely disables all upload commands for this file in JOSM, " +
                         "rather than merely showing a warning before uploading.")
-
     parser.add_argument("--locked", dest="locked", action="store_true",
                         help="Prevent any changes to this file in JOSM, " +
                         "such as editing or downloading, and also prevents uploads. " +
                         "Implies upload=\"never\" and download=\"never\".")
-
     parser.add_argument("--id", dest="id", type=int, default=0,
                         help="ID to start counting from for the output file. Defaults to 0.")
-
     parser.add_argument("--idfile", dest="idfile", type=str, default=None,
                         help="Read ID to start counting from from a file.")
-
     parser.add_argument("--split-ways", dest="max_nodes_per_way", type=int, default=1800,
                         help="Split ways with more than the specified number of nodes. " +
                         "Defaults to 1800. Any value below 2 - do not split.")
-
     parser.add_argument("--saveid", dest="saveid", type=str, default=None,
                         help="Save last ID after execution to a file.")
-
     # Positive IDs can cause big problems if used inappropriately so hide the help for this
     parser.add_argument("--positive-id", dest="positive_id", action="store_true",
                         help=argparse.SUPPRESS)
-
     # Add version attributes. Again, this can cause big problems so surpress the help
     parser.add_argument("--add-version", dest="add_version", action="store_true",
                         help=argparse.SUPPRESS)
-
     # Add timestamp attributes. Again, this can cause big problems so surpress the help
     parser.add_argument("--add-timestamp", dest="add_timestamp", action="store_true",
                         help=argparse.SUPPRESS)
-
     parser.add_argument("--sql", dest="sql_query", type=str, default=None,
                         help="SQL query to execute on a PostgreSQL source")
 
@@ -641,7 +624,7 @@ def main():
     #                     locked=False)
 
     # Parse and process arguments
-    options = vars(parser.parse_args())
+    options = vars(parser.parse_args(args))
 
     if options["source_epsg"]:
         try:
@@ -686,20 +669,31 @@ def main():
     elif options["source_epsg"]:
         l.info("Will use EPSG:" + str(options["source_epsg"]))
 
+    if options["idfile"]:
+        try:
+            with open(options["idfile"], 'r') as ff:
+                options["id"] = int(ff.readline(20))
+        except OSError:
+            l.exception("Couldn't read id file %s." % options["idfile"])
+        else:
+            l.info("Starting counter value '%d' read from file '%s'."
+                   % (options["id"], options["idfile"]))
+
+    return options, parser
+
+
+def main(args: dict):
+    # Parse args and return as dict, along with parser for errors
+    options, parser = setup(args)
+
     # Create memory object for data destination
     try:
         sink = OSMSink(options["source"], **options)
     except RuntimeError:
         # TODO: Useful CLI error message here
         parser.error("Could not parse OGR data source.")
-        raise
 
-    if options["idfile"]:
-        with open(options["idfile"], 'r') as ff:
-            sink.element_id_counter = int(ff.readline(20))
-        l.info("Starting counter value '%d' read from file '%s'."
-               % (sink.element_id_counter, options["idfile"]))
-
+    # TODO: Move this into OSMSink?
     # Stuff needed for locating translation methods
     if options["translation_method"]:
         # add dirs to path if necessary
@@ -780,4 +774,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
