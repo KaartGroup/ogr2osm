@@ -41,13 +41,12 @@ Based very heavily on code released under the following terms:
 '''
 
 import logging as l
-import os
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
-from geom import *
+from geom import Feature, Point, Relation, Way
 from lxml import etree
 from osgeo import ogr, osr
 
@@ -56,6 +55,7 @@ if __name__ == "__main__":
 
 # By default, OGR doesn't raise exceptions, but we want to quit if something isn't working
 ogr.UseExceptions()
+
 l.basicConfig(level=l.DEBUG, format="%(message)s")
 
 
@@ -63,6 +63,8 @@ class OSMSink(object):
     """
     Can accept an ogr.DataSource or a path to one in string or Path form
     """
+
+    destspatialref = osr.SpatialReference().ImportFromEPSG(4326)
 
     def __init__(self, sourcepath, *args, **kwargs):
         self.never_upload = kwargs.get('never_upload', False)
@@ -80,23 +82,11 @@ class OSMSink(object):
             self.element_id_counter_incr = 1
         else:
             self.element_id_counter_incr = -1
-        proj4 = kwargs.get('source_proj4', None)
-        sourceepsg = kwargs.get('source_epsg', None)
-        spatialref = None
-        if proj4:
-            spatialref = osr.SpatialReference().ImportFromProj4(proj4)
-        elif sourceepsg and sourceepsg != 4326:
-            spatialref = osr.SpatialReference().ImportFromEPSG(sourceepsg)
-        if spatialref:
-            destspatialref = osr.SpatialReference().ImportFromEPSG(4326)
-            self.coordtrans = osr.CoordinateTransformation(
-                spatialref, destspatialref)
-            self.reproject = True
-        else:
-            self.reproject = False
+
         nomemorycopy = kwargs.get('no_memory_copy', None)
         self.geometries = []
         self.features = []
+        self.long_ways_from_polygons = set()
         # Running dict of points created. If a point already has been created,
         # it is referenced from the dict rather than created again.
         self.linestring_points = {}
@@ -110,6 +100,23 @@ class OSMSink(object):
         else:
             sourcepath = Path(sourcepath)
             self.source = self.get_file_data(sourcepath, nomemorycopy)
+        if self.source is None:
+            raise RuntimeError
+
+        # Projection
+        proj4 = kwargs.get('source_proj4', None)
+        sourceepsg = kwargs.get('source_epsg', None)
+        spatialref = None
+        if proj4:
+            spatialref = osr.SpatialReference().ImportFromProj4(proj4)
+        elif sourceepsg and sourceepsg != 4326:
+            spatialref = osr.SpatialReference().ImportFromEPSG(sourceepsg)
+        if spatialref:
+            self.coordtrans = osr.CoordinateTransformation(
+                spatialref, self.destspatialref)
+        else:
+            self.coordtrans = None
+        self.parse_data()
 
     def get_new_id(self) -> int:
         self.element_id_counter += self.element_id_counter_incr
@@ -117,43 +124,29 @@ class OSMSink(object):
 
     @staticmethod
     def get_file_data(filename: Path, nomemorycopy: bool = None) -> ogr.DataSource:
-        ogr_accessmethods = ["vsicurl", "vsicurl_streaming", "vsisubfile",
-                             "vsistdin"]
-        ogr_filemethods = ["vsisparse", "vsigzip", "vsitar", "vsizip"]
-        ogr_unsupported = ["vsimem", "vsistdout", ]
-        # Can replace with pathlib
-        has_unsup = [m for m in ogr_unsupported if m
-                     in filename.parts]
+        ogr_accessmethods = {"vsicurl",
+                             "vsicurl_streaming", "vsisubfile", "vsistdin"}
+        ogr_filemethods = {"vsisparse", "vsigzip", "vsitar", "vsizip"}
+        ogr_unsupported = {"vsimem", "vsistdout"}
+        has_unsup = any([m in filename.parts for m in ogr_unsupported])
         if has_unsup:
-            l.error("Unsupported OGR access method(s) found: %s."
-                    % str(has_unsup)[1:-1])
-            raise IOError
-        if not any([m[1:-1] in filename.parts for m in ogr_accessmethods]):
+            l.error("Unsupported OGR access method(s) found: %s." %
+                    str(has_unsup))
+            raise RuntimeError
+        if not any([m in filename.parts for m in ogr_accessmethods]):
             # Not using any ogr_accessmethods
-            # TODO: Fixme
-            real_filename = filename
-            for fm in ogr_filemethods:
-                if filename.parts[1] == fm:
-                    real_filename = filename[len(fm):]
-                    break
-            if len(filename) == len(real_filename):
-                if filename.suffix('.gz'):
-                    filename = Path('/vsigzip/') / filename
-                elif filename.suffix('.tar') or filename.suffix('.tgz') or \
-                        filename.suffix('.tar.gz'):
-                    filename = Path('/vsitar/') / filename
-                elif filename.suffix('.zip'):
-                    filename = Path('/vsizip/') / filename
-            try:
-                fileDataSource = ogr.Open(
-                    str(filename), 0)  # 0 means read-only
-            except:
-                l.exception('OGR failed to open ' + filename +
-                            ', format may be unsupported')
-            if not nomemorycopy:
-                fileDataSource = ogr.GetDriverByName(
-                    'Memory').CopyDataSource(fileDataSource, 'memoryCopy')
-            return fileDataSource
+            if not any([m in filename.parts for m in ogr_filemethods]):
+                if filename.suffix == '.gz':
+                    filename = Path(f'/vsigzip/{str(filename)}')
+                elif any([ext in filename.suffixes for ext in {'.tar', '.tgz'}]):
+                    filename = Path(f'/vsitar/{str(filename)}')
+                elif filename.suffix == '.zip':
+                    filename = Path(f'/vsizip/{str(filename)}')
+        file_data_source = ogr.Open(str(filename), 0)  # 0 means read-only
+        if not nomemorycopy:
+            file_data_source = ogr.GetDriverByName(
+                'Memory').CopyDataSource(file_data_source, 'memoryCopy')
+        return file_data_source
 
     def parse_data(self):
         l.debug("Parsing data")
@@ -165,26 +158,37 @@ class OSMSink(object):
             for i in range(self.source.GetLayerCount()):
                 layer = self.source.GetLayer(i)
                 layer.ResetReading()
-                self.parse_layer(self.translations.filter_layer(layer))
+                self.parse_layer(
+                    self.translations.filter_layer(layer))
 
     def parse_layer(self, layer: ogr.Layer):
         if layer is None:
             return
         field_names = self.get_layer_fields(layer)
+        layer_coordtrans = None
+        if self.coordtrans:
+            layer_coordtrans = self.coordtrans
+        else:
+            spatialref = layer.GetSpatialRef()
+            # If source is already in WGS84, don't bother reprojecting
+            if spatialref != self.destspatialref:
+                layer_coordtrans = osr.CoordinateTransformation(
+                    spatialref, self.destspatialref)
 
         for j in range(layer.GetFeatureCount()):
             ogrfeature = layer.GetNextFeature()
             self.parse_feature(self.translations.filter_feature(
-                ogrfeature, field_names, self.reproject), field_names, self.reproject)
+                ogrfeature, field_names, self.reproject), field_names, layer_coordtrans)
 
-    def parse_feature(self, ogrfeature: ogr.Feature, field_names: list, reproject: bool):
+    def parse_feature(self, ogrfeature: ogr.Feature, field_names: list,
+                      coordtrans: osr.CoordinateTransformation):
         if ogrfeature is None:
             return
         ogrgeometry = ogrfeature.GetGeometryRef()
         if ogrgeometry is None:
             return
-        if reproject:
-            ogrgeometry.Transform(self.coordtrans)
+        if coordtrans:
+            ogrgeometry.Transform(coordtrans)
         geometries = self.parse_geometry([ogrgeometry])
         for geometry in geometries:
             if geometry is None:
@@ -387,19 +391,19 @@ class OSMSink(object):
             feature.geometry: feature for feature in self.features}
 
         for way in ways:
-            is_way_in_relation = len(
-                [p for p in way.parents if type(p) == Relation]) > 0
+            is_way_in_relation = 0 < len(
+                [p for p in way.parents if type(p) == Relation])
             if len(way.points) > max_points_in_way:
-                way_parts = split_way(way, max_points_in_way,
-                                      featuresmap, is_way_in_relation)
+                way_parts = self.split_way(way, max_points_in_way,
+                                           featuresmap, is_way_in_relation)
                 if not is_way_in_relation:
                     if way in waysToCreateRelationFor:
-                        merge_into_new_relation(way_parts)
+                        self.merge_into_new_relation(way_parts)
                 else:
                     for rel in way.parents:
-                        split_way_in_relation(rel, way_parts)
+                        self.split_way_in_relation(rel, way_parts)
 
-    def split_way(self, way, max_points_in_way, features_map, is_way_in_relation):
+    def split_way(self, way, max_points_in_way, features_map, is_way_in_relation: bool):
         new_points = [way.points[i:i + max_points_in_way]
                       for i in range(0, len(way.points), max_points_in_way - 1)]
         new_ways = [way, ] + [Way(self) for i in range(len(new_points) - 1)]
@@ -647,6 +651,7 @@ def main():
         parser.error(
             "ERROR: An output file must be explicitly specified when using a database source")
     else:
+        # If no output specified, use input name, in working directory, with .osm extension
         newname = Path(options["source"]).with_suffix(".osm").name
         options["output_file"] = Path.cwd() / newname
 
@@ -657,6 +662,7 @@ def main():
     if not options["force_overwrite"] and options["output_file"].exists():
         parser.error("ERROR: output file '%s' exists" %
                      (options["output_file"]))
+
     l.info("Preparing to convert '%s' to '%s'." %
            (options["source"], options["output_file"]))
 
@@ -671,10 +677,11 @@ def main():
 
     try:
         sink = OSMSink(options["source"], **options)
-    except:
+    except RuntimeError:
         # TODO: Useful CLI error message here
         parser.error("Could not parse OGR data source.")
         raise
+
     if options["idfile"]:
         with open(options["idfile"], 'r') as ff:
             sink.element_id_counter = int(ff.readline(20))
@@ -706,7 +713,7 @@ def main():
         try:
             sink.translations = __import__(
                 options["translation_method"], fromlist=[''])
-        except ImportError as e:
+        except ImportError:
             parser.error("Could not load translation method '%s'. Translation "
                          "script must be in your current directory, or in the "
                          "translations/ subdirectory of your current or ogr2osm.py "
@@ -739,9 +746,6 @@ def main():
             setattr(sink.translations, k, v)
 
     # Main flow
-    # data = openData(source)
-    sink.long_ways_from_polygons = set()
-    sink.parse_data()
     sink.merge_points()
     sink.merge_way_points()
     if options["max_nodes_per_way"] >= 2:
