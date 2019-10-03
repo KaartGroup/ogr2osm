@@ -701,7 +701,6 @@ def main(args: dict):
         path = Path(options["translation_method"])
         # (root, ext) = os.path.splitext(options["translation_method"])
         if path.exists() and path.suffix == ".py":
-            # if os.path.exists(options["translation_method"]) and ext == '.py':
             # user supplied translation file directly
             # sys.path.insert(0, os.path.dirname(root))
             sys.path.insert(0, path.parent)
