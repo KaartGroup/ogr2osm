@@ -443,13 +443,14 @@ class OSMSink(object):
         for way in way_parts[1:]:
             rel.members.append((way, way_role))
 
-    def output(self, outputfile: Union[str, Path], force_overwrite: bool = False, **kwargs):
+    def output(self, outputfile: Union[str, Path],  **kwargs):
         """
         Outputs the sink to the specified path
 
         :param outputfile: string or Path representing the output location
         :param force_overwrite: if True, overwrite a file if it exists
         """
+        force_overwrite = kwargs.get('force_overwrite', self.force_overwrite)
         never_upload = kwargs.get('never_upload', self.never_upload)
         no_upload_false = kwargs.get('no_upload_false', self.no_upload_false)
         never_download = kwargs.get('never_download', self.never_download)
@@ -761,8 +762,7 @@ def main(args: dict):
     sink.translations.pre_output_transform(sink.geometries, sink.features)
     # Save data to file
     sink.output(
-        options["output_file"],
-        options["force_overwrite"]
+        options["output_file"]
     )
 
     # Save last used id to file
