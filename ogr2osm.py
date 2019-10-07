@@ -59,7 +59,7 @@ ogr.UseExceptions()
 l.basicConfig(level=l.DEBUG, format="%(message)s")
 
 
-class OSMSink(object):
+class OSMSink:
     """
     Can accept an ogr.DataSource or a path to one in string or Path form
     """

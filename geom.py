@@ -7,7 +7,7 @@
 # Classes
 
 
-class Geometry(object):
+class Geometry:
     def __init__(self, osm_sink):
         self.id = osm_sink.get_new_id()
         self.parents = set()
