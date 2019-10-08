@@ -243,13 +243,13 @@ class OSMSink:
             field_names.append(featureDefinition.GetFieldDefn(j).GetNameRef())
         return field_names
 
-    def parse_point(self, ogrgeometry) -> Point:
+    def parse_point(self, ogrgeometry: ogr.Geometry) -> Point:
         x = int(round(ogrgeometry.GetX() * 10**self.significant_digits))
         y = int(round(ogrgeometry.GetY() * 10**self.significant_digits))
         geometry = Point(self, x, y)
         return geometry
 
-    def parse_line_string(self, ogrgeometry) -> Way:
+    def parse_line_string(self, ogrgeometry: ogr.Geometry) -> Way:
         geometry = Way(self)
         # LineString.GetPoint() returns a tuple, so we can't call parse_point on it
         # and instead have to create the point ourself
@@ -268,7 +268,7 @@ class OSMSink:
             mypoint.addparent(geometry)
         return geometry
 
-    def parse_polygon(self, ogrgeometry):
+    def parse_polygon(self, ogrgeometry: ogr.Geometry) -> Union[Way, Relation]:
         # Special case polygons with only one ring. This does not (or at least
         # should not) change behavior when simplify relations is turned on.
         if ogrgeometry.GetGeometryCount() == 0:
@@ -295,7 +295,7 @@ class OSMSink:
                 geometry.members.append((interior, "inner"))
             return geometry
 
-    def parse_collection(self, ogrgeometry):
+    def parse_collection(self, ogrgeometry: ogr.Geometry):
         # OGR MultiPolygon maps easily to osm multipolygon, so special case it
         # TODO: Does anything else need special casing?
         geometryType = ogrgeometry.GetGeometryType()
@@ -385,7 +385,7 @@ class OSMSink:
             if len(merged_points) > 0:
                 way.points = merged_points
 
-    def split_long_ways(self, max_points_in_way, waysToCreateRelationFor):
+    def split_long_ways(self, max_points_in_way: int, waysToCreateRelationFor: set):
         l.debug("Splitting long ways")
         ways = [geom for geom in self.geometries if type(geom) == Way]
 
@@ -405,7 +405,7 @@ class OSMSink:
                     for rel in way.parents:
                         self.split_way_in_relation(rel, way_parts)
 
-    def split_way(self, way, max_points_in_way, features_map, is_way_in_relation: bool):
+    def split_way(self, way, max_points_in_way: int, features_map: dict, is_way_in_relation: bool):
         new_points = [way.points[i:i + max_points_in_way]
                       for i in range(0, len(way.points), max_points_in_way - 1)]
         new_ways = [way, ] + [Way(self) for i in range(len(new_points) - 1)]

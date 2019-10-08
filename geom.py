@@ -57,7 +57,7 @@ class Relation(Geometry):
         i.addparent(self)
 
 
-class Feature(object):
+class Feature:
     def __init__(self, parent):
         self.geometry = None
         self.tags = {}
