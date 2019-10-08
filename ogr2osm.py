@@ -344,7 +344,7 @@ class OSMSink:
 
     def merge_points(self):
         l.debug("Merging points")
-        points = [geom for geom in self.geometries if type(geom) == Point]
+        points = [geom for geom in self.geometries if isinstance(geom, Point)]
 
         # Make list of Points at each location
         l.debug("Making list")
@@ -369,7 +369,7 @@ class OSMSink:
 
     def merge_way_points(self):
         l.debug("Merging duplicate points in ways")
-        ways = [geom for geom in self.geometries if type(geom) == Way]
+        ways = [geom for geom in self.geometries if isinstance(geom,  Way)]
 
         # Remove duplicate points from ways,
         # a duplicate has the same id as its predecessor
@@ -387,14 +387,14 @@ class OSMSink:
 
     def split_long_ways(self, max_points_in_way: int, waysToCreateRelationFor: set):
         l.debug("Splitting long ways")
-        ways = [geom for geom in self.geometries if type(geom) == Way]
+        ways = [geom for geom in self.geometries if isinstance(geom, Way)]
 
         featuresmap = {
             feature.geometry: feature for feature in self.features}
 
         for way in ways:
             is_way_in_relation = 0 < len(
-                [p for p in way.parents if type(p) == Relation])
+                [p for p in way.parents if isinstance(p, Relation)])
             if len(way.points) > max_points_in_way:
                 way_parts = self.split_way(way, max_points_in_way,
                                            featuresmap, is_way_in_relation)
@@ -470,10 +470,10 @@ class OSMSink:
 
         l.debug("Outputting XML")
         # First, set up a few data structures for optimization purposes
-        nodes = [geom for geom in self.geometries if type(geom) == Point]
-        ways = [geom for geom in self.geometries if type(geom) == Way]
+        nodes = [geom for geom in self.geometries if isinstance(geom, Point)]
+        ways = [geom for geom in self.geometries if isinstance(geom, Way)]
         relations = [
-            geom for geom in self.geometries if type(geom) == Relation]
+            geom for geom in self.geometries if isinstance(geom, Relation)]
         featuresmap = {
             feature.geometry: feature for feature in self.features}
 
