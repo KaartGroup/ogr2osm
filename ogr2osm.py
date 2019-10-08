@@ -46,7 +46,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Union
 
 from geom import Feature, Point, Relation, Way
 from lxml import etree
@@ -79,6 +79,9 @@ class OSMSink:
         self.sqlquery = kwargs.get('sql_query', None)
         self.element_id_counter = kwargs.get('id', 0)
         self.force_overwrite = kwargs.get('force_overwrite', False)
+        self.translation_method = kwargs.get('translation_method', None)
+        self.max_nodes_per_way = kwargs.get('max_nodes_per_way', 1800)
+        self.saveid = kwargs.get('saveid', None)
         if kwargs.get("positive_id", False):
             self.element_id_counter_incr = 1
         else:
@@ -107,21 +110,90 @@ class OSMSink:
         # Projection
         proj4 = kwargs.get('source_proj4', None)
         sourceepsg = kwargs.get('source_epsg', None)
-        if proj4:
-            spatialref = osr.SpatialReference().ImportFromProj4(proj4)
-        elif sourceepsg and sourceepsg != 4326:
-            spatialref = osr.SpatialReference().ImportFromEPSG(sourceepsg)
-        else:
-            spatialref = None
-        if spatialref:
+        if proj4 or (sourceepsg and sourceepsg != 4326):
+            spatialref = osr.SpatialReference()
+            if proj4:
+                spatialref.ImportFromProj4(proj4)
+            else:
+                spatialref.ImportFromEPSG(sourceepsg)
             self.coordtrans = osr.CoordinateTransformation(
                 spatialref, self.destspatialref)
         else:
             self.coordtrans = None
 
+        self.translation_method_setup()
+
+        # Main flow
+        self.parse_data()
+        self.merge_points()
+        self.merge_way_points()
+        if self.max_nodes_per_way >= 2:
+            self.split_long_ways(self.max_nodes_per_way,
+                                 self.long_ways_from_polygons)
+        self.translations.pre_output_transform(self.geometries, self.features)
+
     def get_new_id(self) -> int:
         self.element_id_counter += self.element_id_counter_incr
         return self.element_id_counter
+
+    def translation_method_setup(self):
+        # Stuff needed for locating translation methods
+        if self.translation_method:
+            # add dirs to path if necessary
+            path = Path(self.translation_method)
+            # (root, ext) = os.path.splitext(self.translation_method)
+            if path.exists() and path.suffix == ".py":
+                # user supplied translation file directly
+                # sys.path.insert(0, os.path.dirname(root))
+                sys.path.insert(0, path.parent)
+            else:
+                # first check translations in the subdir translations of cwd
+                sys.path.insert(0, Path.getcwd() / "translations")
+                # then check subdir of script dir
+                sys.path.insert(1, Path(__file__).parent /
+                                "translations").resolve()
+                # (the cwd will also be checked implicityly)
+
+            # strip .py if present, as import wants just the module name
+            if path.suffix == '.py':
+                self.translation_method = path.name
+
+            try:
+                self.translations = __import__(
+                    self.translation_method, fromlist=[''])
+            except ImportError:
+                # parser.error("Could not load translation method '%s'. Translation "
+                #             "script must be in your current directory, or in the "
+                #             "translations/ subdirectory of your current or ogr2osm.py "
+                #             "directory. The following directories have been considered: %s"
+                #             % (self.translation_method, str(sys.path)))
+                pass
+            except SyntaxError:
+                # parser.error("Syntax error in '%s'. Translation script is malformed:\n%s"
+                #             % (self.translation_method, e))
+                pass
+
+            l.info("Successfully loaded '%s' translation method ('%s')."
+                   % (self.translation_method, Path(self.translations.__file__).resolve()))
+        else:
+            import types
+            self.translations = types.ModuleType("translationmodule")
+            l.info("Using default translations")
+
+        default_translations = {
+            'filter_layer': lambda layer: layer,
+            'filter_feature': lambda feature, field_names, reproject: feature,
+            'filter_tags': lambda tags: tags,
+            'filter_feature_post': lambda feature, field_names, reproject: feature,
+            'pre_output_transform': lambda geometries, features: None,
+        }
+
+        for k, v in default_translations.items():
+            if hasattr(self.translations, k) and getattr(self.translations, k):
+                l.debug("Using user " + k)
+            else:
+                l.debug("Using default " + k)
+                setattr(self.translations, k, v)
 
     @staticmethod
     def get_file_data(filename: Path, nomemorycopy: bool = None) -> ogr.DataSource:
@@ -138,6 +210,9 @@ class OSMSink:
             # Not using any ogr_accessmethods
             if not any([m in filename.parts for m in ogr_filemethods]):
                 if filename.suffix == '.gz':
+                    # Can't use slash operator here because filename has a root element
+                    # (the first slash) which prevents prepending to the Path
+                    # Converting to str and then assembling is easier
                     filename = Path(f'/vsigzip/{str(filename)}')
                 elif any([ext in filename.suffixes for ext in {'.tar', '.tgz'}]):
                     filename = Path(f'/vsitar/{str(filename)}')
@@ -450,6 +525,7 @@ class OSMSink:
         :param outputfile: string or Path representing the output location
         :param force_overwrite: if True, overwrite a file if it exists
         """
+        # The options set at instance creation can be overriden with kwargs
         force_overwrite = kwargs.get('force_overwrite', self.force_overwrite)
         never_upload = kwargs.get('never_upload', self.never_upload)
         no_upload_false = kwargs.get('no_upload_false', self.no_upload_false)
@@ -459,6 +535,7 @@ class OSMSink:
         add_timestamp = kwargs.get('add_timestamp', self.add_timestamp)
         significant_digits = kwargs.get(
             'significant_digits', self.significant_digits)
+        saveid = kwargs.get('saveid', self.saveid)
 
         # Promote string to Path if neccessary, has no effect if already a Path
         outputfile = Path(outputfile)
@@ -554,8 +631,15 @@ class OSMSink:
 
             f.write('</osm>')
 
+            # Save last used id to file
+        if saveid:
+            with open(saveid, 'wb') as ff:
+                ff.write(str(self.element_id_counter))
+            l.info("Wrote element_id_counter '%d' to file '%s'"
+                   % (self.element_id_counter, saveid))
 
-def setup(args: dict) -> Tuple[dict, argparse.ArgumentParser]:
+
+def setup(args: dict) -> dict:
     parser = argparse.ArgumentParser(prog=sys.argv[0])
     parser.add_argument('source',
                         type=str, metavar="INPUT",
@@ -654,10 +738,6 @@ def setup(args: dict) -> Tuple[dict, argparse.ArgumentParser]:
         parser.error(
             "ERROR: You must use a database source when specifying a query with --sql")
 
-    if not options["force_overwrite"] and options["output_file"].exists():
-        parser.error("ERROR: output file '%s' exists" %
-                     (options["output_file"]))
-
     l.info("Preparing to convert '%s' to '%s'." %
            (options["source"], options["output_file"]))
 
@@ -680,96 +760,24 @@ def setup(args: dict) -> Tuple[dict, argparse.ArgumentParser]:
             l.info("Starting counter value '%d' read from file '%s'."
                    % (options["id"], options["idfile"]))
 
-    return options, parser
+    return options
 
 
 def main(args: dict):
     # Parse args and return as dict, along with parser for errors
-    options, parser = setup(args)
+    options = setup(args)
 
     # Create memory object for data destination
     try:
         sink = OSMSink(options["source"], **options)
     except RuntimeError:
         # TODO: Useful CLI error message here
-        parser.error("Could not parse OGR data source.")
+        # parser.error("Could not parse OGR data source.")
+        l.exception("Could not parse OGR data source")
+        sys.exit(2)
 
-    # TODO: Move this into OSMSink?
-    # Stuff needed for locating translation methods
-    if options["translation_method"]:
-        # add dirs to path if necessary
-        path = Path(options["translation_method"])
-        # (root, ext) = os.path.splitext(options["translation_method"])
-        if path.exists() and path.suffix == ".py":
-            # user supplied translation file directly
-            # sys.path.insert(0, os.path.dirname(root))
-            sys.path.insert(0, path.parent)
-        else:
-            # first check translations in the subdir translations of cwd
-            sys.path.insert(0, Path.getcwd() / "translations")
-            # then check subdir of script dir
-            sys.path.insert(1, Path(__file__).parent /
-                            "translations").resolve()
-            # (the cwd will also be checked implicityly)
-
-        # strip .py if present, as import wants just the module name
-        if path.suffix == '.py':
-            options["translation_method"] = path.name
-
-        try:
-            sink.translations = __import__(
-                options["translation_method"], fromlist=[''])
-        except ImportError:
-            parser.error("Could not load translation method '%s'. Translation "
-                         "script must be in your current directory, or in the "
-                         "translations/ subdirectory of your current or ogr2osm.py "
-                         "directory. The following directories have been considered: %s"
-                         % (options["translation_method"], str(sys.path)))
-        except SyntaxError as e:
-            parser.error("Syntax error in '%s'. Translation script is malformed:\n%s"
-                         % (options["translation_method"], e))
-
-        l.info("Successfully loaded '%s' translation method ('%s')."
-               % (options["translation_method"], Path(sink.translations.__file__).resolve()))
-    else:
-        import types
-        sink.translations = types.ModuleType("translationmodule")
-        l.info("Using default translations")
-
-    default_translations = {
-        'filter_layer': lambda layer: layer,
-        'filter_feature': lambda feature, field_names, reproject: feature,
-        'filter_tags': lambda tags: tags,
-        'filter_feature_post': lambda feature, field_names, reproject: feature,
-        'pre_output_transform': lambda geometries, features: None,
-    }
-
-    for k, v in default_translations.items():
-        if hasattr(sink.translations, k) and getattr(sink.translations, k):
-            l.debug("Using user " + k)
-        else:
-            l.debug("Using default " + k)
-            setattr(sink.translations, k, v)
-
-    # Main flow
-    sink.parse_data()
-    sink.merge_points()
-    sink.merge_way_points()
-    if options["max_nodes_per_way"] >= 2:
-        sink.split_long_ways(options["max_nodes_per_way"],
-                             sink.long_ways_from_polygons)
-    sink.translations.pre_output_transform(sink.geometries, sink.features)
     # Save data to file
-    sink.output(
-        options["output_file"]
-    )
-
-    # Save last used id to file
-    if options["saveid"]:
-        with open(options["saveid"], 'wb') as ff:
-            ff.write(str(sink.element_id_counter))
-        l.info("Wrote element_id_counter '%d' to file '%s'"
-               % (sink.element_id_counter, options["saveid"]))
+    sink.output(options["output_file"])
 
 
 if __name__ == '__main__':
