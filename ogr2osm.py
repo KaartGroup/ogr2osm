@@ -81,7 +81,12 @@ class OSMSink:
         self.force_overwrite = kwargs.get('force_overwrite', False)
         self.translation_method = kwargs.get('translation_method', None)
         self.max_nodes_per_way = kwargs.get('max_nodes_per_way', 1800)
+
+
+<< << << < HEAD
         self.saveid = kwargs.get('saveid', None)
+== == == =
+>>>>>> > Rebase on oop_rewrite
         if kwargs.get("positive_id", False):
             self.element_id_counter_incr = 1
         else:
