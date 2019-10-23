@@ -82,11 +82,7 @@ class OSMSink:
         self.translation_method = kwargs.get('translation_method', None)
         self.max_nodes_per_way = kwargs.get('max_nodes_per_way', 1800)
 
-
-<< << << < HEAD
         self.saveid = kwargs.get('saveid', None)
-== == == =
->>>>>> > Rebase on oop_rewrite
         if kwargs.get("positive_id", False):
             self.element_id_counter_incr = 1
         else:
@@ -766,9 +762,9 @@ def setup(args: dict) -> dict:
     return options
 
 
-def main(args: dict):
+def main():
     # Parse args and return as dict, along with parser for errors
-    options = setup(args)
+    options = setup(sys.argv[1:])
 
     # Create memory object for data destination
     try:
@@ -784,4 +780,4 @@ def main(args: dict):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()
