@@ -560,16 +560,16 @@ class OSMSink:
         with outputfile.open(write_mode, buffering=-1) as f:
             with etree.xmlfile(f, encoding='utf-8', buffered=False) as xf:
                 xf.write_declaration()
-                attrib = {}
+                root_attrib = {}
                 if never_upload:
-                    attrib["upload"] = "never"
+                    root_attrib["upload"] = "never"
                 elif not no_upload_false:
-                    attrib["upload"] = "false"
+                    root_attrib["upload"] = "false"
                 if never_download:
-                    attrib["download"] = "never"
+                    root_attrib["download"] = "never"
                 if locked:
-                    attrib["locked"] = "true"
-                with xf.element('osm', version="0.6", generator="uvmogr2osm", **attrib):
+                    root_attrib["locked"] = "true"
+                with xf.element('osm', version="0.6", generator="uvmogr2osm", **root_attrib):
                     # Build up a dict for optional settings
                     attributes = {}
                     if add_version:
