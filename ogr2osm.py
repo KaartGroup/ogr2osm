@@ -499,7 +499,7 @@ class OSMSink:
             new_way.points = points
             if new_way.id != way.id:
                 for point in points:
-                    point.removeparent(self, way, shoulddestroy=False)
+                    point.removeparent(self, way, should_destroy=False)
                     point.addparent(new_way)
 
         return new_ways
