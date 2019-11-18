@@ -650,8 +650,8 @@ def setup(args: dict) -> dict:
     parser.add_argument("-o", "--output", dest="output_file", metavar="OUTPUT",
                         help="Set destination .osm file name and location.")
     parser.add_argument("-e", "--epsg", dest="source_epsg", metavar="EPSG_CODE", type=int,
-                        help="EPSG code of source file. Do not include the " +
-                        "'EPSG:' prefix. If specified, overrides projection " +
+                        help="EPSG code of source file." +
+                        "If specified, overrides projection " +
                         "from source metadata if it exists.")
     parser.add_argument("-p", "--proj4", dest="source_proj4", metavar="PROJ4_STRING",
                         help="PROJ.4 string. If specified, overrides projection " +
@@ -714,8 +714,13 @@ def setup(args: dict) -> dict:
         try:
             options["source_epsg"] = int(options["source_epsg"])
         except ValueError:
-            parser.error(
-                "EPSG code must be numeric (e.g. '4326', not 'epsg:4326')")
+            # Check if there was an epsg prefix and parse out the number if so
+            if re.match(r'epsg', options['source_epsg'], 'i'):
+                options['source_epsg'] = int(
+                    re.search(r'\d{4}', options['source_epsg']).group())
+            else:
+                parser.error(
+                    "Couldn't parse an EPSG code from the given input.")
 
     if options["locked"] and (options["never_upload"] or options["never_download"]):
         l.info("When specifying a locked file, it is not neccessary to also "
