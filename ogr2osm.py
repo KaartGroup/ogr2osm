@@ -588,7 +588,7 @@ class OSMSink:
                         xmlobject = etree.Element('node', xmlattrs)
 
                         if node in featuresmap:
-                            for (key, value) in featuresmap[node].tags.items():
+                            for (key, value) in sorted(featuresmap[node].tags.items()):
                                 tag = etree.Element(
                                     'tag', {'k': key, 'v': value})
                                 xmlobject.append(tag)
@@ -604,7 +604,7 @@ class OSMSink:
                             nd = etree.Element('nd', {'ref': str(node.id)})
                             xmlobject.append(nd)
                         if way in featuresmap:
-                            for (key, value) in featuresmap[way].tags.items():
+                            for (key, value) in sorted(featuresmap[way].tags.items()):
                                 tag = etree.Element(
                                     'tag', {'k': key, 'v': value})
                                 xmlobject.append(tag)
@@ -625,7 +625,7 @@ class OSMSink:
                             'tag', {'k': 'type', 'v': 'multipolygon'})
                         xmlobject.append(tag)
                         if relation in featuresmap:
-                            for (key, value) in featuresmap[relation].tags.items():
+                            for (key, value) in sorted(featuresmap[relation].tags.items()):
                                 tag = etree.Element(
                                     'tag', {'k': key, 'v': value})
                                 xmlobject.append(tag)
