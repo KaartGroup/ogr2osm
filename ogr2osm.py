@@ -537,6 +537,7 @@ class OSMSink:
         significant_digits = kwargs.get(
             'significant_digits', self.significant_digits)
         saveid = kwargs.get('saveid', self.saveid)
+        # This does nothing at the moment, but could be used in the future
         pretty_print = kwargs.get('pretty_print', False)
 
         # Promote string to Path if neccessary, has no effect if already a Path
@@ -573,11 +574,11 @@ class OSMSink:
                     # Build up a dict for optional settings
                     attributes = {}
                     if add_version:
-                        attributes.update({'version': '1'})
+                        attributes['version'] = '1'
 
                     if add_timestamp:
-                        attributes.update(
-                            {'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')})
+                        attributes['timestamp'] = datetime.utcnow().strftime(
+                            '%Y-%m-%dT%H:%M:%SZ')
 
                     for node in nodes:
                         xmlattrs = {'visible': 'true', 'id': str(node.id), 'lat': str(
@@ -630,7 +631,7 @@ class OSMSink:
                                 xmlobject.append(tag)
                         xf.write(xmlobject)
 
-            # Save last used id to file
+        # Save last used id to file
         if saveid:
             with open(saveid, 'wb') as ff:
                 ff.write(str(self.element_id_counter))
@@ -638,7 +639,7 @@ class OSMSink:
                    % (self.element_id_counter, saveid))
 
 
-def setup(args: dict) -> dict:
+def setup(args: list) -> dict:
     parser = argparse.ArgumentParser(prog=sys.argv[0])
     parser.add_argument('source',
                         type=str, metavar="INPUT",
