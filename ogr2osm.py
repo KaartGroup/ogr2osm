@@ -67,7 +67,7 @@ class OSMSink:
     destspatialref = osr.SpatialReference()
     destspatialref.ImportFromEPSG(4326)
 
-    def __init__(self, sourcepath: Union[str, Path, ogr.DataSource], *args, **kwargs):
+    def __init__(self, sourcepath: Union[str, Path, ogr.DataSource], **kwargs):
         self.never_upload = kwargs.get('never_upload', False)
         self.no_upload_false = kwargs.get('no_upload_false', False)
         self.never_download = kwargs.get('never_download', False)
