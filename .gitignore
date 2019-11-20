@@ -1,4 +1,5 @@
 *.pyc
+*.gfs
 *.osm
 *.shp
 *.shx
