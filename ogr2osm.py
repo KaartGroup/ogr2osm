@@ -282,30 +282,29 @@ class OSMSink:
     def parse_geometry(self, ogrgeometries) -> list:
         returngeometries = []
         for ogrgeometry in ogrgeometries:
-            geometryType = ogrgeometry.GetGeometryType()
+            if ogrgeometry.HasCurveGeometry():  # OSM can't have curved geometry
+                l.info('Converting %s type to linear type',
+                       ogrgeometry.GetGeometryName())
+                ogrgeometry = ogrgeometry.GetLinearGeometry()
 
-            if (geometryType == ogr.wkbPoint or
-                    geometryType == ogr.wkbPoint25D):
+            geometry_type = ogrgeometry.GetGeometryType()
+
+            if geometry_type in {ogr.wkbPoint, ogr.wkbPoint25D}:
                 returngeometries.append(self.parse_point(ogrgeometry))
-            elif (geometryType == ogr.wkbLineString or
-                  geometryType == ogr.wkbLinearRing or
-                  geometryType == ogr.wkbLineString25D):
-                # geometryType == ogr.wkbLinearRing25D does not exist
+            elif geometry_type in {ogr.wkbLineString, ogr.wkbLinearRing,
+                                   # ogr.wkbLinearRing25D does not exist
+                                   ogr.wkbLineString25D}:
                 returngeometries.append(self.parse_line_string(ogrgeometry))
-            elif (geometryType == ogr.wkbPolygon or
-                  geometryType == ogr.wkbPolygon25D):
+            elif geometry_type in {ogr.wkbPolygon, ogr.wkbPolygon25D}:
                 returngeometries.append(self.parse_polygon(ogrgeometry))
-            elif (geometryType == ogr.wkbMultiPoint or
-                  geometryType == ogr.wkbMultiLineString or
-                  geometryType == ogr.wkbMultiPolygon or
-                  geometryType == ogr.wkbGeometryCollection or
-                  geometryType == ogr.wkbMultiPoint25D or
-                  geometryType == ogr.wkbMultiLineString25D or
-                  geometryType == ogr.wkbMultiPolygon25D or
-                  geometryType == ogr.wkbGeometryCollection25D):
+            elif geometry_type in {ogr.wkbMultiPoint, ogr.wkbMultiLineString,
+                                   ogr.wkbMultiPolygon, ogr.wkbGeometryCollection,
+                                   ogr.wkbMultiPoint25D, ogr.wkbMultiLineString25D,
+                                   ogr.wkbMultiPolygon25D, ogr.wkbGeometryCollection25D}:
                 returngeometries.extend(self.parse_collection(ogrgeometry))
             else:
-                l.warning("unhandled geometry, type: " + str(geometryType))
+                l.warning("unhandled geometry, type: %s",
+                          ogrgeometry.GetGeometryName())
                 returngeometries.append(None)
 
         return returngeometries
@@ -374,9 +373,8 @@ class OSMSink:
     def parse_collection(self, ogrgeometry: ogr.Geometry):
         # OGR MultiPolygon maps easily to osm multipolygon, so special case it
         # TODO: Does anything else need special casing?
-        geometryType = ogrgeometry.GetGeometryType()
-        if (geometryType == ogr.wkbMultiPolygon or
-                geometryType == ogr.wkbMultiPolygon25D):
+        geometry_type = ogrgeometry.GetGeometryType()
+        if geometry_type in {ogr.wkbMultiPolygon, ogr.wkbMultiPolygon25D}:
             if ogrgeometry.GetGeometryCount() > 1:
                 geometry = Relation(self)
                 for polygon in range(ogrgeometry.GetGeometryCount()):
@@ -392,8 +390,7 @@ class OSMSink:
                 return [geometry]
             else:
                 return [self.parse_polygon(ogrgeometry.GetGeometryRef(0))]
-        elif (geometryType == ogr.wkbMultiLineString or
-              geometryType == ogr.wkbMultiLineString25D):
+        elif geometry_type in {ogr.wkbMultiLineString, ogr.wkbMultiLineString25D}:
             geometries = []
             for linestring in range(ogrgeometry.GetGeometryCount()):
                 geometries.append(self.parse_line_string(
