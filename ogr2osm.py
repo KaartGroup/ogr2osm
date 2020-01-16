@@ -311,11 +311,11 @@ class OSMSink:
 
     @staticmethod
     def get_layer_fields(layer: ogr.Layer) -> list:
-        featureDefinition = layer.GetLayerDefn()
+        feature_definition = layer.GetLayerDefn()
         field_names = []
-        fieldCount = featureDefinition.GetFieldCount()
-        for j in range(fieldCount):
-            field_names.append(featureDefinition.GetFieldDefn(j).GetNameRef())
+        field_count = feature_definition.GetFieldCount()
+        for j in range(field_count):
+            field_names.append(feature_definition.GetFieldDefn(j).GetNameRef())
         return field_names
 
     def parse_point(self, ogrgeometry: ogr.Geometry) -> Point:
