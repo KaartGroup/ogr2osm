@@ -578,8 +578,12 @@ class OSMSink:
                             '%Y-%m-%dT%H:%M:%SZ')
 
                     for node in nodes:
-                        xmlattrs = {'visible': 'true', 'id': str(node.id), 'lat': str(
-                            node.y*10**-significant_digits), 'lon': str(node.x*10**-significant_digits)}
+                        xmlattrs = {
+                            'lat': str(node.y * 10 ** -significant_digits),
+                            'visible': 'true',
+                            'lon': str(node.x * 10 ** -significant_digits),
+                            'id': str(node.id)
+                        }
                         xmlattrs.update(attributes)
 
                         xmlobject = etree.Element('node', xmlattrs)
