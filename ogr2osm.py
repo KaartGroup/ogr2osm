@@ -634,7 +634,7 @@ class OSMSink:
 
         # Save last used id to file
         if saveid:
-            with open(saveid, 'wb') as ff:
+            with saveid.open('wb') as ff:
                 ff.write(str(self.element_id_counter))
             l.info("Wrote element_id_counter '%d' to file '%s'"
                    % (self.element_id_counter, saveid))
@@ -649,7 +649,7 @@ def setup(args: list) -> dict:
                         metavar="TRANSLATION",
                         help="Select the attribute-tags translation method. See " +
                         "the translations/ directory for valid values.")
-    parser.add_argument("-o", "--output", dest="output_file", metavar="OUTPUT",
+    parser.add_argument("-o", "--output", dest="output_file", metavar="OUTPUT", type=Path,
                         help="Set destination .osm file name and location.")
     parser.add_argument("-e", "--epsg", dest="source_epsg", metavar="EPSG_CODE", type=int,
                         help="EPSG code of source file." +
@@ -681,14 +681,15 @@ def setup(args: list) -> dict:
                         help="Prevent any changes to this file in JOSM, " +
                         "such as editing or downloading, and also prevents uploads. " +
                         "Implies upload=\"never\" and download=\"never\".")
-    parser.add_argument("--id", dest="id", type=int, default=0,
-                        help="ID to start counting from for the output file. Defaults to 0.")
-    parser.add_argument("--idfile", dest="idfile", type=str, default=None,
-                        help="Read ID to start counting from from a file.")
+    id_group = parser.add_mutually_exclusive_group()
+    id_group.add_argument("--id", dest="id", type=int, default=0,
+                          help="ID to start counting from for the output file. Defaults to 0.")
+    id_group.add_argument("--idfile", dest="idfile", type=Path, default=None,
+                          help="Read ID to start counting from from a file.")
     parser.add_argument("--split-ways", dest="max_nodes_per_way", type=int, default=1800,
                         help="Split ways with more than the specified number of nodes. " +
                         "Defaults to 1800. Any value below 2 - do not split.")
-    parser.add_argument("--saveid", dest="saveid", type=str, default=None,
+    parser.add_argument("--saveid", dest="saveid", type=Path, default=None,
                         help="Save last ID after execution to a file.")
     # Positive IDs can cause big problems if used inappropriately so hide the help for this
     parser.add_argument("--positive-id", dest="positive_id", action="store_true",
@@ -728,17 +729,19 @@ def setup(args: list) -> dict:
         l.info("When specifying a locked file, it is not neccessary to also "
                "specify the never download/never upload options.")
 
+    # Detect if source is a Postgress string
     source_is_database = bool(re.match('^PG:', options["source"]))
 
-    if options["output_file"]:
-        options["output_file"] = Path(options["output_file"]).resolve()
-    elif source_is_database:
-        parser.error(
-            "ERROR: An output file must be explicitly specified when using a database source")
-    else:
-        # If no output specified, use input name, in working directory, with .osm extension
-        newname = Path(options["source"]).with_suffix(".osm").name
-        options["output_file"] = Path.cwd() / newname
+    if not options["output_file"]:
+        if source_is_database:
+            # No output file, but the source is a DB
+            parser.error(
+                "ERROR: An output file must be explicitly specified when using a database source")
+        else:
+            # If no output specified and input is a file,
+            # use input name, in working directory, with .osm extension
+            newname = Path(options["source"]).with_suffix(".osm").name
+            options["output_file"] = Path.cwd() / newname
 
     if options["sql_query"] and not source_is_database:
         parser.error(
@@ -758,7 +761,7 @@ def setup(args: list) -> dict:
 
     if options["idfile"]:
         try:
-            with open(options["idfile"], 'r') as ff:
+            with options["idfile"].open('r') as ff:
                 options["id"] = int(ff.readline(20))
         except OSError:
             l.exception("Couldn't read id file %s." % options["idfile"])
