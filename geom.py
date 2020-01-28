@@ -9,7 +9,8 @@
 
 class Geometry:
     def __init__(self, osm_sink):
-        self.id = osm_sink.get_new_id()
+        self.osm_sink = osm_sink
+        self.id = self.osm_sink.get_new_id()
         self.parents = set()
         osm_sink.geometries.append(self)
 
@@ -19,10 +20,10 @@ class Geometry:
     def addparent(self, parent):
         self.parents.add(parent)
 
-    def removeparent(self, osm_sink, parent, should_destroy=True):
+    def removeparent(self, parent, should_destroy=True):
         self.parents.discard(parent)
-        if should_destroy and len(self.parents) == 0:
-            osm_sink.geometries.remove(self)
+        if should_destroy and not self.parents:
+            self.osm_sink.geometries.remove(self)
 
 
 class Point(Geometry):
