@@ -531,9 +531,8 @@ class OSMSink:
         locked = kwargs.get('locked', self.locked)
         add_version = kwargs.get('add_version', self.add_version)
         add_timestamp = kwargs.get('add_timestamp', self.add_timestamp)
-        significant_digits = kwargs.get(
-            'significant_digits', self.significant_digits)
         saveid = kwargs.get('saveid', self.saveid)
+        encoding = kwargs.get('encoding', self.encoding)
         # This does nothing at the moment, but could be used in the future
         pretty_print = kwargs.get('pretty_print', False)
 
@@ -556,7 +555,7 @@ class OSMSink:
 
         # Open up the output file with the system default buffering
         with outputfile.open(write_mode, buffering=-1) as f:
-            with etree.xmlfile(f, encoding='utf-8', buffered=False) as xf:
+            with etree.xmlfile(f, encoding=encoding, buffered=False) as xf:
                 xf.write_declaration()
                 root_attrib = {}
                 if never_upload:
@@ -663,6 +662,8 @@ def setup(args: list) -> dict:
                         help="Output the tags for every feature parsed.")
     parser.add_argument("-f", "--force", dest="force_overwrite", action="store_true",
                         help="Force overwrite of output file.")
+    parser.add_argument("--encoding", default="utf-8", type=str,
+                        help="Encoding of the source file. If specified, overrides ")
     parser.add_argument("--significant-digits",  dest="significant_digits", type=int,
                         help="Number of decimal places for coordinates", default=9)
     parser.add_argument("--rounding-digits",  dest="rounding_digits", type=int,

@@ -25,6 +25,7 @@ class TestParseArgs(unittest.TestCase):
             "add_timestamp": False,
             "add_version": False,
             "debug_tags": False,
+            "encoding": "utf-8",
             "force_overwrite": True,
             "id": 0,
             "idfile": None,
