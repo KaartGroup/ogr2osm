@@ -1,14 +1,13 @@
-# from tempfile import NamedTemporaryFile
-import tempfile
 import unittest
 from pathlib import Path
 
 import ogr2osm
-from lxml import etree
-from xmldiff import main, formatting
-
+from xmldiff import main
 
 TESTDIR = Path('testfiles').resolve()
+DIFF_OPTIONS = {
+    'uniqueattrs': [('node', 'lat'), ('tag', 'k')]
+}
 # TESTDIR = Path.cwd() / 'testfiles'
 # TESTDIR = Path.cwd()
 
@@ -64,25 +63,17 @@ class TestOutput(unittest.TestCase):
     def test1(self):
         testfile = TESTDIR / 'shapefiles/test1.shp'
         goldfile = TESTDIR / 'test1.xml'
+        outputfile = TESTDIR / 'test1.osm'
 
         sink = ogr2osm.OSMSink(
             testfile, force_overwrite=True)
 
-        _, outputfile = tempfile.mkstemp()
-        outputfile = Path(outputfile).with_suffix('.osm')
         sink.output(outputfile)
 
-        # gold_tree = etree.parse(str(goldfile))
-        # output_tree = etree.parse(str(outputfile))
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
 
-        # diff = main.diff_trees(gold_tree, output_tree)
-
-        # print(diff)
-        # self.assertEqual(gold_tree, output_tree)
-        # diff = main.diff_files(str(outputfile), str(outputfile),
-        #                        formatter=formatting.XMLFormatter())
-        with outputfile.open('rb') as outputfile_stream, goldfile.open('rb') as goldfile_stream:
-            self.assertEqual(outputfile_stream, goldfile_stream)
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 
 # duplicatefile
@@ -104,6 +95,7 @@ class TestDuplicateFile(unittest.TestCase):
 
 
 class TestForce(unittest.TestCase):
+    # This test should get changed because it affects behavior of other tests
     def setUp(self):
         return super().setUp()
 
@@ -141,13 +133,17 @@ class TestPositiveID(unittest.TestCase):
     def test_positive_id(self):
         testfile = TESTDIR / 'shapefiles/test1.shp'
         goldfile = TESTDIR / 'positiveid.xml'
+        outputfile = TESTDIR / 'positiveid.osm'
 
         sink = ogr2osm.OSMSink(
             testfile, force_overwrite=True, positive_id=True)
-        outputfile = tempfile.mkstemp()
-        sink.output(tempfile[1])
-        with outputfile.open('rb') as outputfile_stream, goldfile.open('rb') as goldfile_stream:
-            self.assertEqual(outputfile_stream, goldfile_stream)
+
+        sink.output(outputfile)
+
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
+
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 # version
 
@@ -159,13 +155,17 @@ class TestVersion(unittest.TestCase):
     def test_version(self):
         testfile = TESTDIR / 'shapefiles/test1.shp'
         goldfile = TESTDIR / 'version.xml'
+        outputfile = TESTDIR / 'version.osm'
 
         sink = ogr2osm.OSMSink(
             testfile, force_overwrite=True, add_version=True)
 
-        with NamedTemporaryFile('rb') as outputfile, goldfile.open('rb') as goldfile_stream:
-            sink.output(outputfile.name)
-            self.assertEqual(outputfile, goldfile_stream)
+        sink.output(outputfile)
+
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
+
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 # timestamp
 
@@ -193,31 +193,39 @@ class TestUTF8(unittest.TestCase):
     def test_utf8(self):
         testfile = TESTDIR / 'shapefiles/sp_usinas.shp'
         goldfile = TESTDIR / 'utf8.xml'
+        outputfile = TESTDIR / 'utf8.osm'
 
         sink = ogr2osm.OSMSink(
             testfile, force_overwrite=True)
 
-        with NamedTemporaryFile('rb') as outputfile, goldfile.open('rb') as goldfile_stream:
-            sink.output(outputfile.name)
-            self.assertEqual(outputfile, goldfile_stream)
+        sink.output(outputfile)
+
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
+
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 # japanese
 
 
-# class TestJapanese(unittest.TestCase):
-#     def setUp(self):
-#         return super().setUp()
+class TestJapanese(unittest.TestCase):
+    def setUp(self):
+        return super().setUp()
 
-#     def test_version(self):
-#         testfile = TESTDIR / 'shapefiles/japanese.shp'
-#         goldfile = TESTDIR / 'japanese.xml'
+    def test_version(self):
+        testfile = TESTDIR / 'shapefiles/japanese.shp'
+        goldfile = TESTDIR / 'japanese.xml'
+        outputfile = TESTDIR / 'japanese.osm'
 
-#         sink = ogr2osm.OSMSink(
-#             testfile, force_overwrite=True, encoding=shift_jis)
+        sink = ogr2osm.OSMSink(
+            testfile, force_overwrite=True, encoding='shift_jis')
 
-#         with NamedTemporaryFile('wb') as outputfile, goldfile.open('wb') as goldfile_stream:
-#             sink.output(outputfile.name)
-#             self.assertEqual(outputfile, goldfile_stream)
+        sink.output(outputfile)
+
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
+
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 # duplicatewaynodes
 
@@ -229,16 +237,17 @@ class TestDuplicateWayNodes(unittest.TestCase):
     def test_duplicate_way_nodes(self):
         testfile = TESTDIR / 'duplicate-way-nodes.gml'
         goldfile = TESTDIR / 'duplicate-way-nodes.xml'
+        outputfile = TESTDIR / 'duplicate-way-nodes.osm'
 
         sink = ogr2osm.OSMSink(
             testfile, force_overwrite=True)
 
-        _, outputfile = tempfile.mkstemp()
-        outputfile = Path(outputfile).with_suffix('.osm')
         sink.output(outputfile)
 
-        with outputfile.open('rb') as outputfile_stream, goldfile.open('rb') as goldfile_stream:
-            self.assertEqual(outputfile_stream, goldfile_stream)
+        diff = main.diff_files(str(goldfile), str(outputfile), DIFF_OPTIONS)
+
+        # diff should be empty if there are not substantial differences between gold and output
+        self.assertFalse(diff)
 
 # require_output_file_when_using_db_source
 
