@@ -114,6 +114,9 @@ class OSMSink:
         # Projection
         proj4 = kwargs.get('source_proj4', None)
         sourceepsg = kwargs.get('source_epsg', None)
+        if sourceepsg is not None:
+            # Ensure the EPSG is integer. Raises ValueError if an integer isn't obtainable
+            sourceepsg = int(sourceepsg)
         if proj4 or (sourceepsg and sourceepsg != 4326):
             spatialref = osr.SpatialReference()
             if proj4:
@@ -735,6 +738,7 @@ def setup(args: list) -> dict:
     # Parse and process arguments
     options = vars(parser.parse_args(args))
 
+    # Attempt to get a valid EPSG code from the user's input
     if options["source_epsg"]:
         try:
             options["source_epsg"] = int(options["source_epsg"])
@@ -742,7 +746,7 @@ def setup(args: list) -> dict:
             # Check if there was an epsg prefix and parse out the number if so
             if re.match(r'epsg', options['source_epsg'], 'i'):
                 options['source_epsg'] = int(
-                    re.search(r'\d{4}', options['source_epsg']).group())
+                    re.search(r'\d{4,5}', options['source_epsg']).group())
             else:
                 parser.error(
                     "Couldn't parse an EPSG code from the given input.")
@@ -769,7 +773,7 @@ def setup(args: list) -> dict:
 
 
 def main():
-    # Parse args and return as dict, along with parser for errors
+    # Parse args and return as dict
     options = setup(sys.argv[1:])
     if options['verbose']:
         level = l.DEBUG
