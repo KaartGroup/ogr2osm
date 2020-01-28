@@ -78,19 +78,23 @@ class OSMSink:
         self.significant_digits = kwargs.get('significant_digits', 9)
         self.rounding_digits = kwargs.get('rounding_digits', 7)
         self.sqlquery = kwargs.get('sql_query', None)
-        self.element_id_counter = kwargs.get('id', 0)
         self.force_overwrite = kwargs.get('force_overwrite', False)
         self.translation_method = kwargs.get('translation_method', None)
         self.max_nodes_per_way = kwargs.get('max_nodes_per_way', 1800)
         self.encoding = kwargs.get('encoding', 'utf-8')
 
-        self.saveid = kwargs.get('saveid', None)
+        # ID setup
+        self.element_id_counter = self.get_starting_id(kwargs.get("idfile", None),
+                                                       kwargs.get('id', None))
         if kwargs.get("positive_id", False):
             self.element_id_counter_incr = 1
         else:
             self.element_id_counter_incr = -1
 
+        self.saveid = kwargs.get('saveid', None)
+
         nomemorycopy = kwargs.get('no_memory_copy', None)
+
         self.geometries = []
         self.features = []
         self.long_ways_from_polygons = set()
@@ -137,6 +141,24 @@ class OSMSink:
             self.split_long_ways(self.max_nodes_per_way,
                                  self.long_ways_from_polygons)
         self.translations.pre_output_transform(self.geometries, self.features)
+
+    @staticmethod
+    def get_starting_id(idfile, element_id_counter) -> int:
+        if element_id_counter and idfile:
+            l.info("Explicit starting ID was given, idfile will be ignored")
+        elif idfile:
+            try:
+                with idfile.open('r') as f:
+                    element_id_counter = int(f.readline(20))
+            except OSError:
+                l.error("Couldn't read id file %s. Starting from 0." % idfile)
+                element_id_counter = 0
+            else:
+                l.info("Starting counter value '%d' read from file '%s'."
+                       % element_id_counter, idfile)
+        elif element_id_counter is None:
+            element_id_counter = 0
+        return element_id_counter
 
     def get_new_id(self) -> int:
         self.element_id_counter += self.element_id_counter_incr
