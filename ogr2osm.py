@@ -106,6 +106,9 @@ class OSMSink:
             sourcepath = Path(sourcepath)
             self.source = self.get_file_data(sourcepath, nomemorycopy)
         if self.source is None:
+            # ogr.open() returns None on a read error rather than raising an exception,
+            # like a good Python module should.
+            # If we're here, we weren't able to get any valid data, abort
             raise RuntimeError
 
         # Projection
@@ -633,8 +636,8 @@ class OSMSink:
 
         # Save last used id to file
         if saveid:
-            with saveid.open('wb') as ff:
-                ff.write(str(self.element_id_counter))
+            with saveid.open('wb') as f:
+                f.write(str(self.element_id_counter))
             l.info("Wrote element_id_counter '%d' to file '%s'"
                    % (self.element_id_counter, saveid))
 
