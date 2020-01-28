@@ -650,7 +650,7 @@ def setup(args: list) -> dict:
                         "the translations/ directory for valid values.")
     parser.add_argument("-o", "--output", dest="output_file", metavar="OUTPUT", type=Path,
                         help="Set destination .osm file name and location.")
-    parser.add_argument("-e", "--epsg", dest="source_epsg", metavar="EPSG_CODE", type=int,
+    parser.add_argument("-e", "--epsg", dest="source_epsg", metavar="EPSG_CODE", type=str,
                         help="EPSG code of source file." +
                         "If specified, overrides projection " +
                         "from source metadata if it exists.")
@@ -678,19 +678,19 @@ def setup(args: list) -> dict:
     parser.add_argument("--never-upload", dest="never_upload", action="store_true",
                         help="Completely disables all upload commands for this file in JOSM, " +
                         "rather than merely showing a warning before uploading.")
-    parser.add_argument("--locked", dest="locked", action="store_true",
+    parser.add_argument("--locked", action="store_true",
                         help="Prevent any changes to this file in JOSM, " +
                         "such as editing or downloading, and also prevents uploads. " +
                         "Implies upload=\"never\" and download=\"never\".")
     id_group = parser.add_mutually_exclusive_group()
-    id_group.add_argument("--id", dest="id", type=int, default=0,
+    id_group.add_argument("--id", type=int, default=0,
                           help="ID to start counting from for the output file. Defaults to 0.")
-    id_group.add_argument("--idfile", dest="idfile", type=Path, default=None,
+    id_group.add_argument("--idfile", type=Path, default=None,
                           help="Read ID to start counting from from a file.")
     parser.add_argument("--split-ways", dest="max_nodes_per_way", type=int, default=1800,
                         help="Split ways with more than the specified number of nodes. " +
                         "Defaults to 1800. Any value below 2 - do not split.")
-    parser.add_argument("--saveid", dest="saveid", type=Path, default=None,
+    parser.add_argument("--saveid", type=Path, default=None,
                         help="Save last ID after execution to a file.")
     # Positive IDs can cause big problems if used inappropriately so hide the help for this
     parser.add_argument("--positive-id", dest="positive_id", action="store_true",
