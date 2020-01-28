@@ -81,6 +81,7 @@ class OSMSink:
         self.force_overwrite = kwargs.get('force_overwrite', False)
         self.translation_method = kwargs.get('translation_method', None)
         self.max_nodes_per_way = kwargs.get('max_nodes_per_way', 1800)
+        self.encoding = kwargs.get('encoding', 'utf-8')
 
         self.saveid = kwargs.get('saveid', None)
         if kwargs.get("positive_id", False):
