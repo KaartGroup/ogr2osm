@@ -213,7 +213,7 @@ class TestJapanese(unittest.TestCase):
     def setUp(self):
         return super().setUp()
 
-    def test_version(self):
+    def test_japanese(self):
         testfile = TESTDIR / 'shapefiles/japanese.shp'
         goldfile = TESTDIR / 'japanese.xml'
         outputfile = TESTDIR / 'japanese.osm'
@@ -260,7 +260,8 @@ class TestEpsgException(unittest.TestCase):
         testfile = TESTDIR / 'test1.xml'
         with self.assertRaises(ValueError):
             # Note intentionally-mispelled 'ESPG' to force an exception
-            ogr2osm.OSMSink(testfile, force_overwrite=True, source_epsg='ESPG 4326')
+            ogr2osm.OSMSink(testfile, force_overwrite=True,
+                            source_epsg='ESPG 4326')
 
 # Database stuff
 
