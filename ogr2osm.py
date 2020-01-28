@@ -802,7 +802,17 @@ def main():
         sys.exit(2)
 
     # Save data to file
-    sink.output(options["output_file"])
+    try:
+        sink.output(options["output_file"])
+    except FileExistsError:
+        if not options['force_overwrite']:
+            # User didn't say to overwrite the output file
+            l.error("ERROR: Output file exists and overwrite flag not specified. "
+                    "Re-run with the -f flag if you wish to overwrite")
+            sys.exit(2)
+        else:
+            # User wanted to overwrite, but something didn't work
+            raise
 
 
 if __name__ == '__main__':
