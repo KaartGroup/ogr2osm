@@ -109,7 +109,7 @@ class OSMSink:
             # ogr.open() returns None on a read error rather than raising an exception,
             # like a good Python module should.
             # If we're here, we weren't able to get any valid data, abort
-            raise RuntimeError
+            raise RuntimeError('No data obtained from data source')
 
         # Projection
         proj4 = kwargs.get('source_proj4', None)
@@ -228,9 +228,8 @@ class OSMSink:
         ogr_unsupported = {"vsimem", "vsistdout"}
         has_unsup = any([m in filename.parts for m in ogr_unsupported])
         if has_unsup:
-            l.error("Unsupported OGR access method(s) found: %s." %
-                    str(has_unsup))
-            raise RuntimeError
+            raise RuntimeError("Unsupported OGR access method(s) found: %s." %
+                               str(has_unsup))
         if not any([m in filename.parts for m in ogr_accessmethods]):
             # Not using any ogr_accessmethods
             if not any([m in filename.parts for m in ogr_filemethods]):
@@ -269,15 +268,20 @@ class OSMSink:
         if self.coordtrans:
             layer_coordtrans = self.coordtrans
         else:
+            # No spatialref given, try to detect
             spatialref = layer.GetSpatialRef()
-            if not spatialref or self.destspatialref.IsSame(spatialref):
+            if not spatialref:
                 # No projection given and none detected
                 # Assume EPSG:4326
-                l.warning('No spatial reference given and none could be detected.'
+                l.warning('No spatial reference given and none could be detected. '
                           'Assuming the projection is unprojected WGS 84 (EPSG:4326)')
                 layer_coordtrans = None
+            elif self.destspatialref.IsSame(spatialref):
                 # If source is already in WGS84, don't bother reprojecting
+                l.info("EPSG 4326 detected for source file")
+                layer_coordtrans = None
             else:
+                l.info("EPSG %s detected for source file", spatialref.GetAuthorityCode())
                 layer_coordtrans = osr.CoordinateTransformation(
                     spatialref, self.destspatialref)
 
