@@ -251,12 +251,16 @@ class OSMSink:
             layer_coordtrans = self.coordtrans
         else:
             spatialref = layer.GetSpatialRef()
-            # If source is already in WGS84, don't bother reprojecting
-            if spatialref != self.destspatialref:
+            if not spatialref or self.destspatialref.IsSame(spatialref):
+                # No projection given and none detected
+                # Assume EPSG:4326
+                l.warning('No spatial reference given and none could be detected.'
+                          'Assuming the projection is unprojected WGS 84 (EPSG:4326)')
+                layer_coordtrans = None
+                # If source is already in WGS84, don't bother reprojecting
+            else:
                 layer_coordtrans = osr.CoordinateTransformation(
                     spatialref, self.destspatialref)
-            else:
-                layer_coordtrans = None
 
         for j in range(layer.GetFeatureCount()):
             ogrfeature = layer.GetNextFeature()
