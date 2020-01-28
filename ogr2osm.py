@@ -53,12 +53,6 @@ from geom import Feature, Point, Relation, Way
 from lxml import etree
 from osgeo import ogr, osr
 
-# By default, OGR doesn't raise exceptions, but we want to quit if something isn't working
-# Thanks to OGR weirdness, exceptions are not raised on ogr.Open()
-ogr.UseExceptions()
-
-l.basicConfig(level=l.DEBUG, format="%(message)s")
-
 
 class OSMSink:
     """
@@ -738,13 +732,6 @@ def setup(args: list) -> dict:
     parser.add_argument("--sql", dest="sql_query", type=str, default=None,
                         help="SQL query to execute on a PostgreSQL source")
 
-    # parser.set_defaults(source_epsg=None, source_proj4=None, verbose=False,
-    #                     debug_tags=False,
-    #                     translation_method=None, output_file=None,
-    #                     force_overwrite=False, no_upload_false=False,
-    #                     never_download=False, never_upload=False,
-    #                     locked=False)
-
     # Parse and process arguments
     options = vars(parser.parse_args(args))
 
@@ -759,10 +746,6 @@ def setup(args: list) -> dict:
             else:
                 parser.error(
                     "Couldn't parse an EPSG code from the given input.")
-
-    if options["locked"] and (options["never_upload"] or options["never_download"]):
-        l.info("When specifying a locked file, it is not neccessary to also "
-               "specify the never download/never upload options.")
 
     # Detect if source is a Postgress string
     source_is_database = bool(re.match('^PG:', options["source"]))
@@ -782,8 +765,22 @@ def setup(args: list) -> dict:
         parser.error(
             "ERROR: You must use a database source when specifying a query with --sql")
 
-    l.info("Preparing to convert '%s' to '%s'." %
-           (options["source"], options["output_file"]))
+    return options
+
+
+def main():
+    # Parse args and return as dict, along with parser for errors
+    options = setup(sys.argv[1:])
+    if options['verbose']:
+        level = l.DEBUG
+    else:
+        level = l.WARNING
+    l.basicConfig(level=level, format="%(message)s")
+
+    # Redundant lock/upload/download options
+    if options["locked"] and (options["never_upload"] or options["never_download"]):
+        l.warning("When specifying a locked file, it is not neccessary to also "
+                  "specify the never download/never upload options.")
 
     # Projection
     if not options["source_proj4"] and not options["source_epsg"]:
@@ -794,29 +791,13 @@ def setup(args: list) -> dict:
     elif options["source_epsg"]:
         l.info("Will use EPSG:" + str(options["source_epsg"]))
 
-    if options["idfile"]:
-        try:
-            with options["idfile"].open('r') as ff:
-                options["id"] = int(ff.readline(20))
-        except OSError:
-            l.exception("Couldn't read id file %s." % options["idfile"])
-        else:
-            l.info("Starting counter value '%d' read from file '%s'."
-                   % (options["id"], options["idfile"]))
-
-    return options
-
-
-def main():
-    # Parse args and return as dict, along with parser for errors
-    options = setup(sys.argv[1:])
+    l.info("Preparing to convert '%s' to '%s'." %
+           (options["source"], options["output_file"]))
 
     # Create memory object for data destination
     try:
         sink = OSMSink(options["source"], **options)
     except RuntimeError:
-        # TODO: Useful CLI error message here
-        # parser.error("Could not parse OGR data source.")
         l.exception("Could not parse OGR data source")
         sys.exit(2)
 
