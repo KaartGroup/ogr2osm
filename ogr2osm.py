@@ -526,7 +526,7 @@ class OSMSink:
         for way in way_parts[1:]:
             rel.members.append((way, way_role))
 
-    def output(self, outputfile: Union[str, Path],  **kwargs):
+    def output(self, outputfile: Union[str, Path], **kwargs):
         """
         Outputs the sink to the specified path
 
@@ -545,6 +545,8 @@ class OSMSink:
         encoding = kwargs.get('encoding', self.encoding)
         # This does nothing at the moment, but could be used in the future
         pretty_print = kwargs.get('pretty_print', False)
+
+        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
         # Promote string to Path if neccessary, has no effect if already a Path
         outputfile = Path(outputfile)
@@ -576,7 +578,7 @@ class OSMSink:
                     root_attrib["download"] = "never"
                 if locked:
                     root_attrib["locked"] = "true"
-                with xf.element('osm', version="0.6", generator="uvmogr2osm", **root_attrib):
+                with xf.element('osm', version="0.6", **root_attrib, generator="uvmogr2osm"):
                     # Build up a dict for optional settings
                     attributes = {}
                     if add_version:
