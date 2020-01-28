@@ -281,7 +281,8 @@ class OSMSink:
                 l.info("EPSG 4326 detected for source file")
                 layer_coordtrans = None
             else:
-                l.info("EPSG %s detected for source file", spatialref.GetAuthorityCode())
+                l.info("EPSG %s detected for source file",
+                       spatialref.GetAuthorityCode())
                 layer_coordtrans = osr.CoordinateTransformation(
                     spatialref, self.destspatialref)
 
@@ -443,7 +444,8 @@ class OSMSink:
         '''
         tags = {}
         for index, item in enumerate(field_names):
-            tags[item] = ogrfeature.GetFieldAsString(index).strip()
+            tags[item] = ogrfeature.GetFieldAsBinary(
+                index).decode(self.encoding)
         return self.translations.filter_tags(tags)
         # return tags
 
@@ -590,7 +592,7 @@ class OSMSink:
 
         # Open up the output file with the system default buffering
         with outputfile.open(write_mode, buffering=-1) as f:
-            with etree.xmlfile(f, encoding=encoding, buffered=False) as xf:
+            with etree.xmlfile(f, encoding="utf-8", buffered=False) as xf:
                 xf.write_declaration()
                 root_attrib = {}
                 if never_upload:
@@ -698,7 +700,8 @@ def setup(args: list) -> dict:
     parser.add_argument("-f", "--force", dest="force_overwrite", action="store_true",
                         help="Force overwrite of output file.")
     parser.add_argument("--encoding", default="utf-8", type=str,
-                        help="Encoding of the source file. If specified, overrides ")
+                        help="Encoding of the source file. If specified, overrides " +
+                        "the default of utf-8")
     parser.add_argument("--significant-digits",  dest="significant_digits", type=int,
                         help="Number of decimal places for coordinates", default=9)
     parser.add_argument("--rounding-digits",  dest="rounding_digits", type=int,
