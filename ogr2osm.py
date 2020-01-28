@@ -506,14 +506,14 @@ class OSMSink:
             new_way.points = points
             if new_way.id != way.id:
                 for point in points:
-                    point.removeparent(self, way, should_destroy=False)
+                    point.removeparent(way, should_destroy=False)
                     point.addparent(new_way)
 
         return new_ways
 
     def merge_into_new_relation(self, way_parts):
         new_relation = Relation(self)
-        feat = Feature()
+        feat = Feature(self)
         feat.geometry = new_relation
         new_relation.members = [(way, "outer") for way in way_parts]
         for way in way_parts:
