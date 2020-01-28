@@ -250,6 +250,20 @@ class TestDuplicateWayNodes(unittest.TestCase):
         # diff should be empty if there are not substantial differences between gold and output
         self.assertFalse(diff)
 
+
+# bad epsg raises
+class TestEpsgException(unittest.TestCase):
+    def setUp(self):
+        return super().setUp()
+
+    def test_epsg_exception(self):
+        testfile = TESTDIR / 'test1.xml'
+        with self.assertRaises(ValueError):
+            # Note intentionally-mispelled 'ESPG' to force an exception
+            ogr2osm.OSMSink(testfile, force_overwrite=True, source_epsg='ESPG 4326')
+
+# Database stuff
+
 # require_output_file_when_using_db_source
 
 
