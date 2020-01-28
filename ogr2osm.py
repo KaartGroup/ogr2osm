@@ -45,6 +45,7 @@ import logging as l
 import re
 import sys
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Union
 
@@ -323,8 +324,8 @@ class OSMSink:
         return field_names
 
     def parse_point(self, ogrgeometry: ogr.Geometry) -> Point:
-        x = int(round(ogrgeometry.GetX() * 10**self.significant_digits))
-        y = int(round(ogrgeometry.GetY() * 10**self.significant_digits))
+        x = round(Decimal(ogrgeometry.GetX()), self.significant_digits)
+        y = round(Decimal(ogrgeometry.GetY()), self.significant_digits)
         geometry = Point(self, x, y)
         return geometry
 
@@ -333,11 +334,11 @@ class OSMSink:
         # LineString.GetPoint() returns a tuple, so we can't call parse_point on it
         # and instead have to create the point ourself
         for i in range(ogrgeometry.GetPointCount()):
-            (x, y, _) = ogrgeometry.GetPoint(i)
-            (rx, ry) = (int(round(x*10**self.rounding_digits)),
-                        int(round(y*10**self.rounding_digits)))
-            (x, y) = (int(round(x*10**self.significant_digits)),
-                      int(round(y*10**self.significant_digits)))
+            (x, y) = ogrgeometry.GetPoint_2D(i)
+            (rx, ry) = (round(Decimal(x), self.rounding_digits),
+                        round(Decimal(y), self.rounding_digits))
+            (x, y) = (round(Decimal(x), self.significant_digits),
+                      round(Decimal(y), self.significant_digits))
             if (rx, ry) in self.linestring_points:
                 mypoint = self.linestring_points[(rx, ry)]
             else:
@@ -427,10 +428,11 @@ class OSMSink:
         l.debug("Making list")
         pointcoords = {}
         for i in points:
+            # Using ints as the keys for simplicity's sake
             rx = int(
-                round(i.x * 10**(self.significant_digits-self.rounding_digits)))
+                round(i.x * 10**(2 * self.significant_digits - self.rounding_digits)))
             ry = int(
-                round(i.y * 10**(self.significant_digits-self.rounding_digits)))
+                round(i.y * 10**(2 * self.significant_digits - self.rounding_digits)))
             if (rx, ry) in pointcoords:
                 pointcoords[(rx, ry)].append(i)
             else:
@@ -577,14 +579,14 @@ class OSMSink:
                         attributes['version'] = '1'
 
                     if add_timestamp:
-                        attributes['timestamp'] = datetime.utcnow().strftime(
-                            '%Y-%m-%dT%H:%M:%SZ')
-
+                        attributes['timestamp'] = now
                     for node in nodes:
+                        # Finally remove trailing zeroes from decimals with normalize()
+                        # to save a few bytes
                         xmlattrs = {
-                            'lat': str(node.y * 10 ** -significant_digits),
+                            'lat': str(node.y.normalize()),
                             'visible': 'true',
-                            'lon': str(node.x * 10 ** -significant_digits),
+                            'lon': str(node.x.normalize()),
                             'id': str(node.id)
                         }
                         xmlattrs.update(attributes)
