@@ -572,9 +572,8 @@ class OSMSink:
         add_version = kwargs.get('add_version', self.add_version)
         add_timestamp = kwargs.get('add_timestamp', self.add_timestamp)
         saveid = kwargs.get('saveid', self.saveid)
-        encoding = kwargs.get('encoding', self.encoding)
         # This does nothing at the moment, but could be used in the future
-        pretty_print = kwargs.get('pretty_print', False)
+        # pretty_print = kwargs.get('pretty_print', False)
 
         now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
