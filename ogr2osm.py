@@ -282,7 +282,7 @@ class OSMSink:
                 layer_coordtrans = None
             else:
                 l.info("EPSG %s detected for source file",
-                       spatialref.GetAuthorityCode())
+                       spatialref.GetAuthorityCode(None))
                 layer_coordtrans = osr.CoordinateTransformation(
                     spatialref, self.destspatialref)
 
@@ -444,8 +444,13 @@ class OSMSink:
         '''
         tags = {}
         for index, item in enumerate(field_names):
-            tags[item] = ogrfeature.GetFieldAsBinary(
-                index).decode(self.encoding)
+            # Decoding strings in case they're in a weird encoding
+            if ogrfeature.GetFieldDefnRef(index).GetTypeName().lower() == "string":
+                tags[item] = ogrfeature.GetFieldAsBinary(
+                    index).decode(self.encoding)
+            # Numeric types et al can be safely read at face valuse
+            else:
+                tags[item] = ogrfeature.GetFieldAsString(index)
         return self.translations.filter_tags(tags)
         # return tags
 
