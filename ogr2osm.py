@@ -762,7 +762,7 @@ def setup(args: list) -> dict:
                 parser.error(
                     "Couldn't parse an EPSG code from the given input.")
 
-    # Detect if source is a Postgress string
+    # Detect if source is a PostgreSQL string
     source_is_database = bool(re.match('^PG:', options["source"]))
 
     if not options["output_file"]:
