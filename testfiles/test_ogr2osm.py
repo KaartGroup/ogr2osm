@@ -268,20 +268,35 @@ class TestEpsgException(unittest.TestCase):
 # require_output_file_when_using_db_source
 
 
-# class TestRequireOutputFileWhenUsingDBSource(unittest.TestCase):
-#     def setUp(self):
-#         return super().setUp()
+class TestRequireOutputFileWhenUsingDBSource(unittest.TestCase):
+    def setUp(self):
+        return super().setUp()
 
-#     def test_require_output_file_when_using_db_source(self):
-#         teststring = "PG:dbname=test"
+    def test_require_output_file_when_using_db_source(self):
+        testargs = ["PG:dbname=test"]
+
+        with self.assertRaises(SystemExit) as cm:
+            ogr2osm.setup(testargs)
+
+        self.assertEqual(cm.exception.code, 2)
 
 
 # require_db_source_for_sql_query
 
 
-# class TestRequireDbSourceForSqlQuery(unittest.TestCase):
-#     def setUp(self):
-#         return super().setUp()
+class TestRequireDbSourceForSqlQuery(unittest.TestCase):
+    def setUp(self):
+        return super().setUp()
 
-#     def test_require_db_source_for_sql_query(self):
-#         testfile = TESTDIR / 'shapefiles/test1.shp'
+    def test_require_db_source_for_sql_query(self):
+        testfile = TESTDIR / 'shapefiles/test1.shp'
+        testargs = [
+            str(testfile),
+            '--sql',
+            'SELECT * FROM test1'
+        ]
+
+        with self.assertRaises(SystemExit) as cm:
+            ogr2osm.setup(testargs)
+
+        self.assertEqual(cm.exception.code, 2)
