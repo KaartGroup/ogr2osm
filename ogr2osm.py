@@ -403,7 +403,7 @@ class OSMSink:
                 geometry.members.append((interior, "inner"))
             return geometry
 
-    def parse_collection(self, ogrgeometry: ogr.Geometry):
+    def parse_collection(self, ogrgeometry: ogr.Geometry) -> list:
         # OGR MultiPolygon maps easily to osm multipolygon, so special case it
         # TODO: Does anything else need special casing?
         geometry_type = ogrgeometry.GetGeometryType()
@@ -452,7 +452,6 @@ class OSMSink:
             else:
                 tags[item] = ogrfeature.GetFieldAsString(index)
         return self.translations.filter_tags(tags)
-        # return tags
 
     def merge_points(self):
         l.debug("Merging points")
@@ -518,7 +517,8 @@ class OSMSink:
                     for rel in way.parents:
                         self.split_way_in_relation(rel, way_parts)
 
-    def split_way(self, way, max_points_in_way: int, features_map: dict, is_way_in_relation: bool):
+    def split_way(self, way, max_points_in_way: int,
+                  features_map: dict, is_way_in_relation: bool) -> list:
         new_points = [way.points[i:i + max_points_in_way]
                       for i in range(0, len(way.points), max_points_in_way - 1)]
         new_ways = [way, ] + [Way(self) for i in range(len(new_points) - 1)]
