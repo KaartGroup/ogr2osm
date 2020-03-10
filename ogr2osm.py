@@ -61,6 +61,12 @@ class OSMSink:
 
     destspatialref = osr.SpatialReference()
     destspatialref.ImportFromEPSG(4326)
+    try:
+        # Enforce x, y coordinate order
+        destspatialref.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+    except AttributeError:
+        # Using GDAL version that predates the lat/long switch
+        pass
 
     def __init__(self, sourcepath: Union[str, Path, ogr.DataSource], **kwargs):
         self.never_upload = kwargs.get('never_upload', False)
